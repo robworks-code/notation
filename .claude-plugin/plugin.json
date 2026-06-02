@@ -1,0 +1,19 @@
+{
+  "name": "notation",
+  "version": "0.1.0",
+  "description": "Capture session learnings into the right Claude Code memory tier. /notation:notate routes each learning to global CLAUDE.md, ~/.claude/notes/, per-project MEMORY.md, or project docs - with a lean bias that keeps CLAUDE.md small. Ships a notation-audit skill that flags bloat, stale notes, and orphaned index entries.",
+  "author": {
+    "name": "Ryan Robson and Robworks Software LLC"
+  },
+  "homepage": "https://github.com/robworks-code/notation",
+  "repository": "https://github.com/robworks-code/notation",
+  "license": "MIT",
+  "keywords": [
+    "claude-md",
+    "memory",
+    "notes",
+    "documentation",
+    "productivity",
+    "context-management"
+  ]
+}
