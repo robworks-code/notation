@@ -9,9 +9,42 @@ disable-model-invocation: true
 
 Turn what you learned this session into durable, well-placed notation. The job is not "append to CLAUDE.md" - it is to send each learning to the **one tier where it belongs**, defaulting away from CLAUDE.md so it stays small and fast, and to apply only the changes the user actually wants.
 
-**Auto-apply mode.** If `$ARGUMENTS` contains `all`, `--all`, `-y`, or `yes`, run in auto-apply mode: follow Steps 1-5 exactly as written, but in Step 6 skip every `AskUserQuestion` and apply **all** proposals. Still print the proposals/diffs first and still back up `~/.claude/CLAUDE.md` before any inline rule edit. Otherwise run the interactive flow as written.
+**Auto-apply mode.** If `$ARGUMENTS` contains `all`, `--all`, `-y`, or `yes`, run in auto-apply mode: follow Steps 0-5 exactly as written, but in Step 6 skip every `AskUserQuestion` and apply **all** proposals. Still print the proposals/diffs first and still back up `~/.claude/CLAUDE.md` before any inline rule edit. Otherwise run the interactive flow as written.
+
+**Full-flow override.** If `$ARGUMENTS` contains `full`, skip Step 0's flow-shaping entirely and run the complete default flow (full extraction across all tiers + the Step 6 strategy picker), regardless of how small the session looks. Use this when you disagree with the adaptive read.
 
 Read the full decision tree at `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/routing-rubric.md` if a learning is hard to place. The compact version is in Step 3.
+
+## Step 0 - Read the session and choose the flow
+
+Before extracting anything, do a lightweight read of the conversation to right-size the rest of
+the flow. This does not replace Step 1's grounding - it decides how much of Steps 1-6 to run.
+
+Produce four signals from your in-context recall plus a light transcript glance (same transcript
+located in Step 1):
+
+- **Session type** - debugging / config / feature work / research / quick-Q&A.
+- **Volume & confidence** - rough count of candidate learnings and whether they are clear-cut.
+- **Tier relevance** - which tiers the session actually exercised. If the session never touched
+  project-specific decisions, do not hunt for project-memory candidates in Step 2; focus
+  extraction on the tiers the session exercised.
+- **Worth-saving gate** - is there anything that meaningfully recurs at all?
+
+Then pick one flow shape and **announce it in one line** before proceeding:
+
+| Read | Flow |
+| --- | --- |
+| Nothing worth saving | Early-exit: say so in one line and stop. Do not manufacture proposals. |
+| Exactly 1 clear learning | Run Steps 1-5 for that learning, then in Step 6 skip the strategy question and go straight to the single-proposal `Apply / Edit first / Skip` confirm. |
+| Small, focused (a few learnings, one or two tiers) | Run Steps 1-5 scoped to the relevant tiers; in Step 6 use the picker but expect few options. |
+| Rich / mixed | Run the full default flow, Steps 1-6. |
+
+Announcement example:
+`Read: short config session, 1 high-confidence learning. -> Skipping strategy picker, will confirm the single proposal. (say 'full' to force the complete flow)`
+
+If `$ARGUMENTS` contains `full`, skip this step's shaping and run the complete default flow.
+If `$ARGUMENTS` requested auto-apply (`all` etc.), still do this read for type/tier-focus/early-exit,
+but never reintroduce a picker - Step 6 stays in auto-apply mode.
 
 ## Step 1 - Build the picture (session + project)
 
@@ -109,7 +142,7 @@ If the learning is already covered, mark the proposal `UPDATE` and make the diff
 
 ## Step 6 - Present, then apply through the interactive picker
 
-First **print all proposals as text**, grouped by tier, ordered high-confidence first. For each: `title - kind - confidence`, the one-line **why**, and the short **diff**. (The picker's multi-select has no preview pane, so the diffs must be visible here, above the questions.)
+First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. The diffs must appear above the questions because the picker's multi-select has no preview pane.
 
 **Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (atomic content+index writes), item 4 (CLAUDE.md backup), and item 5 (summary). The summary should note it auto-applied all N proposals.
 
