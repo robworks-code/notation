@@ -18,7 +18,7 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 
 1. Read `~/.claude/CLAUDE.md` and `Glob` `~/.claude/notes/*.md`. For the current project, locate the memory dir via `ls -d ~/.claude/projects/*/memory 2>/dev/null` and read its `MEMORY.md`.
 2. Walk the checklist in `references/audit-checklist.md` and collect findings.
-3. Report findings grouped by severity (move / fix / tidy), each with the file path and a one-line rationale.
+3. Report findings using the shared format in `references/output-format.md`: a scorecard header (`Audited: ... - <x> move - <y> fix - <z> tidy`), then one numbered table per severity group (move / fix / tidy) with columns `# - title - severity - problem`, each row referencing a file by absolute path.
 4. Offer to apply fixes. Apply only what the user approves. Before editing `~/.claude/CLAUDE.md`, back it up: `cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$(date +%Y%m%d-%H%M%S)`.
 
 ## What to look for (summary)

@@ -43,4 +43,4 @@ List `~/.claude/CLAUDE.md.bak.*` snapshots. If there are several, offer to prune
 
 ## Reporting
 
-End with a short summary: counts per severity, and the single highest-impact action (usually a CLAUDE.md -> notes move). Offer to apply approved fixes, backing up CLAUDE.md first.
+Render the report with the shared format in `output-format.md`: a scorecard header summarizing the audit scope and the severity tally (`<x> move - <y> fix - <z> tidy`), then one numbered table per severity group (move / fix / tidy) using columns `# - title - severity - problem`. End with the single highest-impact action (usually a CLAUDE.md -> notes move). Offer to apply approved fixes, backing up CLAUDE.md first.
