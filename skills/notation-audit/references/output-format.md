@@ -17,8 +17,9 @@ If a tier has zero items, omit it from the tally rather than printing `0`.
 ## Zone 2 - Per-tier tables
 
 One compact table per non-empty tier (or per severity group, for audit). Order rows
-high-confidence first (capture) or move -> fix -> tidy (audit). Number rows so the picker and
-the diffs below can reference them by `#`.
+high-confidence first (capture) or move -> fix -> tidy (audit). Number rows continuously across
+all tier tables (do not reset to 1 per tier) so the picker and the diffs below can reference
+them by a unique `#`.
 
 Capture columns: `#`, `title`, `kind`, `conf`, `destination`.
 Audit columns: `#`, `title`, `severity`, `problem`.

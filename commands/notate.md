@@ -1,6 +1,6 @@
 ---
 description: Capture this session's learnings and route each one to the right memory tier - global CLAUDE.md, ~/.claude/notes/, per-project MEMORY.md, or project docs. Grounds proposals in the actual project + session, then applies them through an interactive picker. Keeps CLAUDE.md lean.
-argument-hint: "[all]"
+argument-hint: "[all|full]"
 allowed-tools: ["Read", "Edit", "Write", "Glob", "Bash", "AskUserQuestion"]
 disable-model-invocation: true
 ---
@@ -11,7 +11,7 @@ Turn what you learned this session into durable, well-placed notation. The job i
 
 **Auto-apply mode.** If `$ARGUMENTS` contains `all`, `--all`, `-y`, or `yes`, run in auto-apply mode: follow Steps 0-5 exactly as written, but in Step 6 skip every `AskUserQuestion` and apply **all** proposals. Still print the proposals/diffs first and still back up `~/.claude/CLAUDE.md` before any inline rule edit. Otherwise run the interactive flow as written.
 
-**Full-flow override.** If `$ARGUMENTS` contains `full`, skip Step 0's flow-shaping entirely and run the complete default flow (full extraction across all tiers + the Step 6 strategy picker), regardless of how small the session looks. Use this when you disagree with the adaptive read.
+**Full-flow override.** If `$ARGUMENTS` contains `full`, skip Step 0's flow-shaping entirely and run the complete default flow (full extraction across all tiers + the Step 6 strategy picker), regardless of how small the session looks. Use this when you disagree with the adaptive read. If both `full` and an auto-apply trigger (`all` etc.) are present, auto-apply wins: Step 0 shaping is skipped but the picker is still suppressed.
 
 Read the full decision tree at `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/routing-rubric.md` if a learning is hard to place. The compact version is in Step 3.
 
@@ -35,7 +35,7 @@ Then pick one flow shape and **announce it in one line** before proceeding:
 | Read | Flow |
 | --- | --- |
 | Nothing worth saving | Early-exit: say so in one line and stop. Do not manufacture proposals. |
-| Exactly 1 clear learning | Run Steps 1-5 for that learning, then in Step 6 skip the strategy question and go straight to the single-proposal `Apply / Edit first / Skip` confirm. |
+| Exactly 1 clear learning | Run Steps 1-5 for that learning, then in Step 6 skip the strategy question and go straight to the single-proposal `Apply / Edit first / Skip` confirm. (In auto-apply mode, apply directly - no confirm.) |
 | Small, focused (a few learnings, one or two tiers) | Run Steps 1-5 scoped to the relevant tiers; in Step 6 use the picker but expect few options. |
 | Rich / mixed | Run the full default flow, Steps 1-6. |
 
