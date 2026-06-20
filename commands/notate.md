@@ -142,7 +142,7 @@ If the learning is already covered, mark the proposal `UPDATE` and make the diff
 
 ## Step 6 - Present, then apply through the interactive picker
 
-First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. The diffs must appear above the questions because the picker's multi-select has no preview pane.
+First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. Each diff body goes in a ` ```diff ` fenced block so `+`/`-` lines render with color coding. The diffs must appear above the questions because the picker's multi-select has no preview pane.
 
 **Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (atomic content+index writes), item 4 (CLAUDE.md backup), and item 5 (summary). The summary should note it auto-applied all N proposals.
 

@@ -43,15 +43,25 @@ Audit example:
 
 ## Zone 3 - Diffs below
 
-After all tables, print the full diffs in fenced blocks, each keyed by the same `#` used in the
-table. This keeps tables scannable while still printing every diff above any AskUserQuestion
-picker (the picker has no preview pane, so diffs must be visible first).
+After all tables, print the full diffs, each keyed by the same `#` used in the table. Put the
+destination-path header on its own line, then the diff body in a fenced block tagged `diff` so
+`+`/`-` lines render with color coding. This keeps tables scannable while still printing every
+diff above any AskUserQuestion picker (the picker has no preview pane, so diffs must be visible
+first).
 
-    [1] ~/.claude/CLAUDE.md  (GLOBAL RULES)
-    + `gh pr merge * --repo <o>/<r>:*` - narrow per-repo merge permission rule shape
+For a `NEW` proposal, show only the added (`+`) lines. For an `UPDATE`, show both the removed
+(`-`) and added (`+`) lines so it renders as a real before/after diff rather than just an
+addition.
+
+[1] ~/.claude/CLAUDE.md  (GLOBAL RULES)
+
+```diff
++ `gh pr merge * --repo <o>/<r>:*` - narrow per-repo merge permission rule shape
+```
 
 ## Cosmetic rules (apply to all modes)
 
 - Plain hyphens (`-`) only. No em-dashes or en-dashes.
 - Reference files by absolute path.
 - Be concise. Tables over prose.
+- Diff bodies go in ` ```diff ` fenced blocks so `+`/`-` lines get color coding.
