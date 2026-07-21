@@ -53,6 +53,14 @@ For a `NEW` proposal, show only the added (`+`) lines. For an `UPDATE`, show bot
 (`-`) and added (`+`) lines so it renders as a real before/after diff rather than just an
 addition.
 
+**Removals (`-` lines) are the exception, not the norm.** Most notation is additive - append
+new lines, relocate detail to notes, keep existing content. An `UPDATE` should carry `-` lines
+only when the removed content is factually wrong or directly contradicted by the new learning
+(see `routing-rubric.md` > "Preservation"). When a diff does delete a line, its table `problem`
+/ `why` must state why the old line is gone ("removes X - contradicted by Y"), so no deletion
+is silent. A `move` that relocates CLAUDE.md content into a note shows the `-` lines leaving
+CLAUDE.md AND the identical `+` lines landing in the note - the fact is preserved, not dropped.
+
 [1] ~/.claude/CLAUDE.md  (GLOBAL RULES)
 
 ```diff

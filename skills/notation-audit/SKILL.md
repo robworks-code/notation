@@ -21,14 +21,17 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 3. Report findings using the shared format in `references/output-format.md`: a scorecard header (`Audited: ... - <x> move - <y> fix - <z> tidy`), then one numbered table per severity group (move / fix / tidy) with columns `# - title - severity - problem`, each row referencing a file by absolute path.
 4. Offer to apply fixes. Apply only what the user approves. Before editing `~/.claude/CLAUDE.md`, back it up: `cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$(date +%Y%m%d-%H%M%S)`.
 
+**Preservation first.** This audit is additive: it **relocates** and **appends**, it does not trim. Never propose deleting a still-true line to save space - move it to `notes/` instead. The only safe deletions are a redundant cross-tier copy (the fact survives elsewhere) or a line that is factually wrong or contradicted by newer notation, and those must be named explicitly. Losing a hard-won line is worse than a slightly long file. Full rule: `references/routing-rubric.md` > "Preservation".
+
 ## What to look for (summary)
 
-- **CLAUDE.md bloat**: inline entries that are tool/platform/API-specific and belong in `notes/`. These are the highest-value moves - they shrink the every-session prompt.
+- **CLAUDE.md bloat**: inline entries that are tool/platform/API-specific and belong in `notes/`. These are the highest-value **moves** (relocate every fact, do not trim) - they shrink the every-session prompt without losing anything.
 - **Orphaned index lines**: a Topical Notes Index entry whose `notes/<topic>.md` file does not exist, or a note file with no index line.
 - **Oversized notes**: a single note that has grown large enough to split by sub-topic.
 - **Memory without a pointer**: a frontmatter memory file with no matching line in `MEMORY.md` (or a `MEMORY.md` line pointing at a missing file).
-- **Cross-tier duplication**: the same fact living in two tiers.
-- **Backup clutter**: stale `~/.claude/CLAUDE.md.bak.*` snapshots the user may want to prune.
+- **Cross-tier duplication**: the same fact living in two tiers - keep the more specific copy, drop the redundant one.
+- **Missing recency dates**: new-style notes entries or memory files lacking a date; nudge new additions toward `(YYYY-MM-DD)` / `metadata.updated`.
+- **Backup clutter**: stale `~/.claude/CLAUDE.md.bak.*` snapshots the user may want to prune (keep the most recent one or two - they are the preservation safety net).
 
 Full detail and the routing rubric used to decide where a stray entry should move: `references/audit-checklist.md` and `references/routing-rubric.md`.
 

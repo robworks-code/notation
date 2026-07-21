@@ -34,6 +34,27 @@ The answer maps to a tier. Frequency and breadth push toward CLAUDE.md; specific
 - **One fact, one place.** Do not mirror the same fact across tiers. If it is already in notes, do not also inline it.
 - **Project vs global.** If the fact stops being true when you switch repos, it is project memory, not global.
 
+## Preservation (never destroy history)
+
+Notation is **additive by default**. Existing lines in `~/.claude/CLAUDE.md` and in project `MEMORY.md` / memory files carry hard-won history; losing them is far more costly than a little duplication or length.
+
+- **An `UPDATE` may DELETE an existing line ONLY when that line is factually wrong, or a newer learning directly contradicts it.** In that case, the removal *is* the point - the stale fact must go. Otherwise, never remove.
+- **Superseded-but-still-true content is preserved, not overwritten.** If the new learning extends or refines an existing entry, keep the old line and append the new detail (dated - see below) rather than rewriting the line in place.
+- **When an inline CLAUDE.md entry has grown too big, relocate - do not trim.** Move the detail into `notes/<topic>.md` (preserving every fact) and leave a one-line index pointer. Relocation keeps the information; trimming loses it.
+- **Prefer `NEW`-append or move-to-notes over `UPDATE`-rewrite.** Reach for an in-place rewrite only for the narrow wrong/contradicted case above. A bias toward `UPDATE` is what silently erases history - default away from it.
+- **Never condense two true facts into one lossy summary.** If both still hold, both stay.
+
+When a removal genuinely is warranted (wrong/contradicted), say so explicitly in the proposal's `why` ("removes X - contradicted by Y") so the deletion is visible and justified, never incidental.
+
+## Recency timestamps
+
+New entries carry an absolute date so a future session can tell recent notation from old. Use the machine date, not a guess: `date +%Y-%m-%d`.
+
+- **Topical notes.** Tag each new sub-entry or `##` section with an inline `(YYYY-MM-DD)`, e.g. a heading `## Bucket TTL (2026-07-21)` or a bullet ending ` (2026-07-21)`. When appending to an existing note, date only the appended lines - do not restamp the whole file.
+- **Project memory.** Add an `updated: YYYY-MM-DD` line under `metadata:` in the frontmatter (and set it again whenever the file is edited). This is the recency signal for the memory tier.
+- **Global CLAUDE.md.** Do NOT date inline rules - the every-session file stays clean and dateless. Recency for global rules is not worth the visual noise.
+- Dates are ASCII digits and hyphens only; never introduce Unicode or en/em dashes into a date.
+
 ## Memory type field
 
 When writing a project memory file, set `metadata.type`:

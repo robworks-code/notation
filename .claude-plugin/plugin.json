@@ -1,6 +1,6 @@
 {
   "name": "notation",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Capture session learnings into the right Claude Code memory tier. /notation:notate reads the session first - classifying its type, gauging volume, and identifying exercised tiers - then right-sizes the flow and announces the chosen shape. A structured scorecard + per-tier table format presents proposals across all modes. Supports a 'full' override to force the complete flow. /notation:notate-all applies every proposal without the picker. Ships a notation-audit skill with the same structured reporting.",
   "author": {
     "name": "Ryan Robson and Robworks Software LLC"

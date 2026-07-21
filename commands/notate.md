@@ -108,13 +108,17 @@ For each proposal, read ONLY the destination file (and the relevant section), no
 - Project memory: the per-project memory dir (see Step 5)
 - Project CLAUDE.md / docs: `./CLAUDE.md`, `./.claude/docs/`
 
-If the learning is already covered, mark the proposal `UPDATE` and make the diff an in-place edit rather than a duplicate. If a `notes/` file for the topic already exists, the diff appends to it; only create a new note when no topic file fits. Drop any proposal that turns out to be fully covered already.
+If the learning is already covered, drop the proposal - do not restate it. If it **extends** an existing entry, prefer a **`NEW`-append** (add a new dated line/sub-entry near the existing one) over an in-place rewrite. If a `notes/` file for the topic already exists, the diff appends to it; only create a new note when no topic file fits.
+
+**Preservation is the default (read `routing-rubric.md` > "Preservation").** An `UPDATE` that DELETES an existing line is allowed **only** when that line is factually wrong or is directly contradicted by the new learning - and then the removal must be named in the `why` ("removes X - contradicted by Y"). In every other case, keep the old line and append the new detail. Never overwrite superseded-but-still-true content, and never condense two true facts into one lossy summary. This applies with full force to `~/.claude/CLAUDE.md` rules and to project `MEMORY.md` / memory files, where lost lines are hard-won history. If an inline CLAUDE.md entry is simply too long, **relocate it to `notes/` (every fact preserved) - do not trim it.**
 
 ## Step 5 - Tier-specific formatting (how each diff should look)
 
 **Topical note (`~/.claude/notes/<topic>.md`):**
 - Markdown with `##` section headings and fenced code blocks for commands.
+- **Date every new entry.** Get the date once with `date +%Y-%m-%d`, then tag each new sub-entry or `##` section inline, e.g. `## Bucket TTL (2026-07-21)` or a bullet ending ` (2026-07-21)`. When appending to an existing note, date only the appended lines - do not restamp the file. This lets a future session tell recent notation from old.
 - Pair every note add/create with the **Topical Notes Index** line at the bottom of `~/.claude/CLAUDE.md`: `` - [`notes/<topic>.md`](notes/<topic>.md) - <hook> ``. The index line is the only CLAUDE.md change a note requires, and it does not need the Step 6 backup unless you are also editing rules inline.
+- **When a note is the destination because you relocated bulk from CLAUDE.md, move every fact verbatim** - relocation must not lose detail.
 
 **Project memory:**
 - Find the per-project memory dir. It is the harness path `~/.claude/projects/<encoded-cwd>/memory/`, where `<encoded-cwd>` is the absolute cwd with every `/` replaced by `-` (leading slash included). Confirm with:
@@ -129,14 +133,17 @@ If the learning is already covered, mark the proposal `UPDATE` and make the diff
   description: <one-line summary for recall relevance>
   metadata:
     type: user | feedback | project | reference
+    updated: <YYYY-MM-DD>
   ---
 
   <the fact. For feedback/project, add **Why:** and **How to apply:** lines. Link related memories with [[other-slug]].>
   ```
+- **Set `updated:` from `date +%Y-%m-%d`** on create, and again on every edit - it is the recency signal for the memory tier.
 - Convert relative dates ("today", "last week") to absolute (YYYY-MM-DD).
 - Pair every memory file with a one-line pointer in that dir's `MEMORY.md`: `- [Title](file.md) - hook`. Never put the fact body in `MEMORY.md`; it is the index only.
+- **Editing an existing memory file is append/refine, not replace.** Keep still-true content; only drop a line that is wrong or contradicted, and bump `updated:` when you do.
 
-**Global CLAUDE.md rule:** one line per concept, in the most relevant existing section. Format `` `<command/pattern>` - <brief note> ``. No verbose prose.
+**Global CLAUDE.md rule:** one line per concept, in the most relevant existing section. Format `` `<command/pattern>` - <brief note> ``. No verbose prose. Do not date inline rules - the every-session file stays clean. Add a rule; never silently rewrite or drop an existing one unless it is wrong or contradicted (see Step 4 / Preservation).
 
 **Project CLAUDE.md / docs:** match the file's existing style.
 
