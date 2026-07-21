@@ -34,7 +34,7 @@ Send feedback about the plugin - a bug, an idea, or a routing correction that we
 ## Install
 
 ```
-claude plugin marketplace add ringo380/robworks-claude-code-plugins
+claude plugin marketplace add robworks-code/robworks-claude-code-plugins
 claude plugin install notation@robworks-claude-code-plugins
 ```
 
