@@ -24,6 +24,13 @@ Same session read, routing, and presentation as `/notation:notate`, but it skips
 ### `notation-audit` skill
 Auto-invocable health check. Ask it to "audit my notes" or "check CLAUDE.md for bloat" and it reports inline entries that should move to notes, orphaned index links, oversized notes, memory files missing pointers, cross-tier duplication, and stale backups - then offers targeted fixes.
 
+### `/notation:feedback`
+Send feedback about the plugin - a bug, an idea, or a routing correction that went wrong - straight to the maintainer as a support ticket. It attaches lightweight context (plugin version, OS, and a short note on what notation did this session), shows you the exact payload, and **always confirms before sending**. Anonymous by default; add your email only if you want a reply.
+
+## How it preserves your notes
+
+`notation` is **additive by default**. It never rewrites or drops a still-true line in `CLAUDE.md` or your memory files to save space - an in-place removal happens only when a line is factually wrong or directly contradicted by a newer learning. When an inline entry has just grown too big, it **relocates** the detail into a topical note (every fact intact) rather than trimming it. New notes and memory entries are stamped with the date they were added (`(YYYY-MM-DD)` in notes, `updated:` in memory frontmatter) so recency is always visible.
+
 ## Install
 
 ```

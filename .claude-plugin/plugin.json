@@ -1,7 +1,7 @@
 {
   "name": "notation",
-  "version": "0.5.0",
-  "description": "Capture session learnings into the right Claude Code memory tier. /notation:notate reads the session first - classifying its type, gauging volume, and identifying exercised tiers - then right-sizes the flow and announces the chosen shape. A structured scorecard + per-tier table format presents proposals across all modes. Supports a 'full' override to force the complete flow. /notation:notate-all applies every proposal without the picker. Ships a notation-audit skill with the same structured reporting.",
+  "version": "0.6.0",
+  "description": "Capture session learnings into the right Claude Code memory tier. /notation:notate reads the session first - classifying its type, gauging volume, and identifying exercised tiers - then right-sizes the flow and announces the chosen shape. A structured scorecard + per-tier table format presents proposals across all modes. Supports a 'full' override to force the complete flow. /notation:notate-all applies every proposal without the picker. /notation:feedback sends a bug, idea, or routing correction to the maintainer as a support ticket. Ships a notation-audit skill with the same structured reporting. Notation is additive: it preserves existing lines and dates new entries rather than overwriting history.",
   "author": {
     "name": "Ryan Robson and Robworks Software LLC"
   },
