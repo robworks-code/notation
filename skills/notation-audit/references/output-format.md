@@ -36,27 +36,28 @@ high-confidence first (capture) or move -> fix -> tidy (audit). Number rows cont
 all tier tables (do not reset to 1 per tier) so the picker and the diffs below can reference
 them by a unique `#`.
 
-Capture columns: `#`, `title`, `kind`, `conf`, `destination`.
+Capture columns: `#`, `title`, `kind`, `conf`, `destination`, and `delta` when the table needs it.
 Audit columns: `#`, `title`, `severity`, `problem`, `delta`.
 
-The audit `delta` is that row's signed effect on `~/.claude/CLAUDE.md` in characters (`-1,840`,
-`+118`, `0`), computed from the diff text. Rows that touch only notes or memory are `0`. The column
-sums to the ledger's net figure.
+`delta` is that row's signed effect on `~/.claude/CLAUDE.md` in characters (`-1,840`, `+118`, `0`),
+computed from the diff text. Audit tables always carry it. **A capture table carries it when ANY of
+its rows touches that file** - every inline global rule, and every note row that also adds a Topical
+Notes Index line. Delta is a whole-column decision, never per-row: once a table has the column,
+every row in it shows a number, and rows with no CLAUDE.md effect show `0`. A table where no row
+touches the file omits the column entirely. Across the whole report the column sums to the ledger's
+net figure.
 
-Capture tables add the same `delta` column **only to the GLOBAL RULES table** (and to any note row
-that adds a Topical Notes Index line), for the same reason: those are the rows that cost every
-future session. Tables with no CLAUDE.md effect omit the column entirely.
-
-Capture example:
+Capture example (GLOBAL RULES always carries delta; TOPICAL NOTES carries it here because row 2
+creates a note and therefore an index line, while row 3 appends to a note that is already indexed):
 
     GLOBAL RULES
       #  title               kind   conf   destination           delta
       1  gh merge wildcard    NEW    high   ~/.claude/CLAUDE.md    +94
 
     TOPICAL NOTES
-      #  title               kind   conf   destination
-      2  railway bucket TTL   NEW    high   ~/.claude/notes/railway.md
-      3  supabase RLS gotcha  NEW    med    ~/.claude/notes/supabase.md
+      #  title               kind   conf   destination                  delta
+      2  railway bucket TTL   NEW    high   ~/.claude/notes/railway.md   +118
+      3  supabase RLS gotcha  NEW    med    ~/.claude/notes/supabase.md     0
 
 Audit example:
 

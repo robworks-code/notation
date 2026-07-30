@@ -34,9 +34,9 @@ Read `~/.claude/CLAUDE.md`. For each inline entry or subsection, ask the routing
 
 Do NOT flag the genuinely global sections (permissions, gh/git quirks, shell/PATH gotchas, session/harness behavior, workflow preferences, accessibility requirements).
 
-## 2. Topical Notes Index integrity (fix)
+## 2. Topical Notes Index integrity and weight (fix / move)
 
-Compare the "Topical Notes Index" section in CLAUDE.md against the actual files in `~/.claude/notes/`.
+Compare the "Topical Notes Index" section in CLAUDE.md against the actual files in `~/.claude/notes/`. The first three checks below are **fix** findings; the last two are **move** findings - group each row under the severity it carries, not under this heading's, so the scorecard tally stays honest.
 
 - Index line -> file that does not exist = **orphaned link**, flag to fix (remove the line or restore the file).
 - Note file with no index line = **unindexed note**, flag to add a one-line entry. This one **grows** CLAUDE.md - record the positive delta and offset it.

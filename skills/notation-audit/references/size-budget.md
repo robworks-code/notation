@@ -75,7 +75,7 @@ loaded every session.
    single win; usually thousands of chars each.
 2. **Fat inline entry -> note + pointer.** A multi-line inline bullet with commands, error strings,
    or a recipe becomes a note section plus a one-line inline pointer (keep the *trigger* inline, move
-   the *detail* out): `- <one-line rule>. Detail: `notes/<topic>.md``.
+   the *detail* out): `` `- <one-line rule>. Detail: `notes/<topic>.md`` ``.
 3. **Append into an existing note.** Prefer appending to a topic note that already exists over
    creating a new one - a new note also costs a new index line. Check `~/.claude/notes/` first.
 4. **Cross-tier duplicate removal.** An inline copy of a fact that already lives in a note is the

@@ -91,6 +91,7 @@ Turn each survivor into a **proposal** with these fields - you will reuse them v
 - **kind** - `NEW` (add) or `UPDATE` (edit an existing entry in place)
 - **confidence** - high / med / low (how sure you are it recurs and is correctly placed)
 - **diff** - the concrete text to add or change, and the exact destination path
+- **delta** - the proposal's signed character effect on `~/.claude/CLAUDE.md`, counted from the diff text. Non-zero for an inline global rule and for a new note (which costs a Topical Notes Index line); `0` for everything else. Step 3's budget gate and Step 6's tables and ledger both read this field.
 
 ## Step 3 - Route each learning (do NOT dump)
 
@@ -108,7 +109,7 @@ Assign every proposal's **tier**:
 
 **Budget gate (applies to every global-tier proposal).** Capture is the only thing that grows `~/.claude/CLAUDE.md`; the audit can only claw back what capture adds. So every proposal routed to the global tier must pay for its characters:
 
-- **Compute its character cost** from the diff text and carry it into the tables and the scorecard.
+- **Compute its character cost** from the diff text into the proposal's `delta` field (Step 2), and carry that into the tables and the scorecard.
 - **Keep the inline line to one line.** If the learning needs more than that, the trigger goes inline and the detail goes to `notes/<topic>.md` - inline prose is the main way this file drifts.
 - **When the measured size from Step 1 is at or over 40,000 chars, the global tier is closed by default.** Re-ask the routing question with a hostile eye: if there is any plausible topic file, route it to `notes/` instead. Promote inline only if the rule genuinely fires regardless of what you are working on AND you say so in the proposal's `why`, naming the size ("CLAUDE.md is at 59,482 - promoting anyway because ...").
 - **A note is not free either**: a new note also costs an index line in CLAUDE.md, so prefer appending to an existing topic file (Step 4 checks this).
