@@ -49,7 +49,7 @@ add that a second pass may be needed - estimates here skew optimistic. See `size
 After applying, print the ledger again with the **re-measured** after-size - never claim a size you
 have not measured - and print the preservation tally on its own line above it:
 
-    Preservation: 22/22 relocated phrases verified in their destination.
+    Preservation: 16/16 relocations verified (bytes conserved, probes hit, sources clean).
     ~/.claude/CLAUDE.md: 59,482 -> 39,887 chars (target 40,000) - under, after 4 passes
 
 If any probe failed, that line replaces the size line entirely: name the move that lost content,

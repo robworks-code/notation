@@ -214,29 +214,46 @@ rest**, per tactic:
 
 | Tactic | Method |
 | --- | --- |
-| 1. Subsection -> note | `delta = -(measured bytes of the lines leaving) + (bytes of the drafted index line)`. Both halves are measurable now: the section is in front of you, and the index line is one line you write at report time. |
-| 2. Fat inline entry -> note + pointer | `delta = -(measured bytes of the entry) + (bytes of the drafted one-line pointer)`. **Draft the pointer before quoting the number** - that is the whole content of the proposal anyway. |
-| 3. Append into an existing note | `0` unless a new index line is needed. Measured, not estimated. |
-| 4. Cross-tier duplicate removal | `-(measured bytes of the inline copy)`. Exact. |
-| 5. Index-line compression | Measure the per-line spread, then `delta = -(sum of current lengths of the over-cap lines) + (cap x count)`. Using the cap as the replacement length is the honest estimate; the real hooks land near it. |
+| 1. Subsection -> note | `delta = -(measured bytes of the lines leaving) + (drafted pointer line) + (drafted index line, only if the note is new)`. All parts are available now: the section is in front of you, and both lines are ones you write at report time. |
+| 2. Fat inline entry -> note + pointer | Same three parts as tactic 1: `-(measured bytes of the entry) + (drafted pointer) + (drafted index line if the note is new)`. **Draft the replacement before quoting the number** - it is the substance of the proposal anyway. |
+| 3. Append into an existing note | Same as tactic 1 **minus the index line**, since the note is already indexed: `-(measured bytes leaving) + (drafted pointer)`. Not `0` - that is the capture-side answer, where nothing leaves the file. |
+| 4. Cross-tier duplicate removal | `-(measured bytes of the inline copy)`. Exact - nothing replaces it. |
+| 5. Index-line compression | Measure the per-line spread, then `delta = -(sum of current lengths of the over-cap lines) + (cap x count)`. |
 | 6. Note consolidation | `-(measured bytes of the N-1 index lines being dropped)`. Exact. |
 | 7. Prose -> one line | Draft the replacement line, then `-(measured) + (drafted)`. Never quote this one without drafting. |
 
 The pattern is the same throughout: **the thing being removed is always measurable, so measure it;
 the thing replacing it is always short, so draft it.** A delta quoted without doing both is a guess.
 
+**"Measured" means a byte count you ran, not a block you eyeballed.** Extract the lines and count
+them - do not estimate from how long the section looks in context:
+
+```bash
+sed -n '412,468p' ~/.claude/CLAUDE.md | wc -c
+```
+
 ### Mark which rows are measured
 
-Rows whose both halves are measured (tactics 3, 4, 6, and any row where you drafted the replacement)
-are **measured**. Rows where the replacement is an assumed length (tactic 5's cap, or any row where
-you did not draft) are **estimated**. Mark the estimated ones - see `output-format.md` > Zone 2 - so
-a reader knows which figures to trust and the ledger's own confidence is visible.
+A row is **measured** only when *both* halves are real: the removed bytes were counted with a
+command, and the replacement line was drafted. Tactics 4 and 6 have no replacement, so they are
+always measured. Tactics 1, 2, 3 and 7 are measured once you draft. A row is **estimated** when the
+replacement length is assumed rather than drafted - tactic 5's cap is the standard case. Mark the
+estimated ones - see `output-format.md` > Zone 2 - so a reader knows which figures to trust.
+
+Note the direction each estimate errs in, and do not describe them as if they all lean one way:
+**tactic 5 is pessimistic** (the cap is a ceiling, so a real compression usually saves a little more
+than quoted), while an **undrafted replacement is optimistic** (drafted lines reliably run longer
+than imagined). The net-optimistic bias below comes from the undrafted rows and from index lines
+that get forgotten, which is exactly why the table above counts them explicitly.
 
 ### A projection is a projection
 
 State plainly that the ledger's projected size is an estimate and that the apply step may need
-another round. Estimates here skew **optimistic**: replacement lines and index entries reliably cost
-more than they look, so a run projected to land just under target frequently lands just over. When
+another round. In aggregate these projections skew **optimistic** - undrafted replacement lines and
+forgotten index entries cost more than they look - so a run projected to land just under target
+frequently lands just over. Never excuse a shortfall as estimation error before confirming the moves
+actually applied in full (`verify-after-apply.md` > "Also check the source side"); a half-applied
+move looks identical to an optimistic estimate. When
 the projection is within a few thousand chars of the target, say so ("projected 38,172 - close
 enough to target that a second pass may be needed").
 
