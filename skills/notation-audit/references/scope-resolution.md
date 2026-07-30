@@ -66,10 +66,11 @@ Ask this **before** the routing tree in `routing-rubric.md`:
   `~/.claude/CLAUDE.md` and `~/.claude/notes/<topic>.md`.
 
 Asking the tier question first is what produces the leak, because a learning can be
-tool-shaped **and** repo-bound at the same time. "Our Railway service needs its bucket TTL
-set at create time" is a Railway fact, so the tier tree sends it to the global
-`notes/railway.md` - where every other repo's session now loads one repo's deployment
-detail. Scope first sends it to project memory, which is where it stops being true the
+tool-shaped **and** repo-bound at the same time. "Our uploads bucket is named lc-prod-uploads
+and lives in the us-west Railway project" is repo-specific, so it belongs in project
+memory. But if you ask tier first ("is this tool-shaped?"), the tree sends it to the
+global `notes/railway.md` - where every other repo's session now loads one repo's
+deployment detail. Scope first routes it to project memory, where it stops being true the
 moment you `cd` elsewhere.
 
 The mirror case is real too: a fact discovered *while* working in one repo is not thereby

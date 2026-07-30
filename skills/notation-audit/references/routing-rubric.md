@@ -19,10 +19,11 @@ Before the tree below, ask:
 - **No -> global scope.** Branches 1 and 2 apply.
 
 Running the tree first is what produces a scope leak, because a learning can be
-tool-shaped **and** repo-bound at once: "our Railway service needs its bucket TTL set at
-create time" is a Railway fact, so branch 2 files it in the global `notes/railway.md`,
-where every other repo's session then loads one repo's deployment detail. Full rule,
-the mirror case, and the never-cross list: `scope-resolution.md`.
+tool-shaped **and** repo-bound at once: "our uploads bucket is named lc-prod-uploads and
+lives in the us-west Railway project" is repo-specific, so it belongs in project memory,
+not the global `notes/railway.md`. But if you ask tier first ("is this tool-shaped?"),
+branch 2 files it there, where every other repo's session then loads this repo's
+deployment detail. Full rule, the mirror case, and the never-cross list: `scope-resolution.md`.
 
 ## Decision tree
 
