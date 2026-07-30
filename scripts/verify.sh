@@ -60,6 +60,9 @@ print("\n".join(missing) if missing else "all resolve")
 sys.exit(1 if missing else 0)
 PY
 
+step "scope-resolution tests"
+python3 tests/test_scope_resolution.py || bad "scope-resolution tests"
+
 step "preservation-procedure mutation tests"
 python3 tests/test_preservation_probe.py || bad "preservation mutation tests"
 

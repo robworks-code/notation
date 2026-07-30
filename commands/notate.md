@@ -52,8 +52,18 @@ Before proposing anything, ground yourself in two sources so proposals are real,
 
 **Session (what actually happened):** combine your in-context recall with a light scan of this session's transcript, which catches learnings that scrolled out of context.
 ```bash
-# encoded-cwd = absolute cwd with every "/" replaced by "-" (leading slash included)
-enc=$(pwd | sed 's#/#-#g')
+# encoded-cwd = absolute cwd with every "/" AND every "." replaced by "-".
+# Omitting the "." case is the classic bug: it resolves any dotted path to a
+# directory that does not exist. Full rule: scope-resolution.md.
+```
+
+<!-- canonical-encoding -->
+```sh
+encode_cwd() { printf '%s' "$1" | sed 's#[/.]#-#g'; }
+```
+
+```bash
+enc=$(encode_cwd "$(pwd)")
 tx=$(ls -t ~/.claude/projects/"$enc"/*.jsonl 2>/dev/null | head -1)
 echo "transcript: $tx"
 ```
@@ -141,11 +151,17 @@ If the learning is already covered, drop the proposal - do not restate it. If it
 - **When a note is the destination because you relocated bulk from CLAUDE.md, move every fact verbatim** - relocation must not lose detail.
 
 **Project memory:**
-- Find the per-project memory dir. It is the harness path `~/.claude/projects/<encoded-cwd>/memory/`, where `<encoded-cwd>` is the absolute cwd with every `/` replaced by `-` (leading slash included). Confirm with:
+- Find the per-project memory dir by **exact path**, using the `encode_cwd` helper defined
+  in Step 1 - never a `*` glob, which matches every project on the machine and cannot
+  identify this one:
   ```bash
-  ls -d ~/.claude/projects/*/memory 2>/dev/null
+  mem="$HOME/.claude/projects/$(encode_cwd "$(pwd)")/memory"
+  ls -d "$mem" 2>/dev/null
   ```
-  and match the entry whose name encodes the current project path. If none exists for this project, ask the user before creating one.
+  If it does not exist, this project has no memory yet - ask the user before creating one.
+  If the session has additional working directories, resolve against the primary cwd and
+  say which project you resolved. Full rule:
+  `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/scope-resolution.md`.
 - One fact per file. Frontmatter:
   ```markdown
   ---
