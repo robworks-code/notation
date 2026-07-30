@@ -204,16 +204,48 @@ index line - the one-line pointer in `./CLAUDE.md` is the whole overhead.
 
 Quote a saving from the **distribution, not the total**. Before promising "compressing the index
 saves ~12k", measure the per-line spread - median length and how many lines actually exceed the
-budget - because a total says nothing about how much of it is compressible. After applying, restate
-the **measured** number rather than letting the projection stand.
+budget - because a total says nothing about how much of it is compressible.
+
+### Every row's delta needs a method, not a feeling
+
+`output-format.md` requires a signed delta per row, "computed from the diff text" - but at report
+time the diff does not exist yet. Produce the number by **measuring what you can and drafting the
+rest**, per tactic:
+
+| Tactic | Method |
+| --- | --- |
+| 1. Subsection -> note | `delta = -(measured bytes of the lines leaving) + (bytes of the drafted index line)`. Both halves are measurable now: the section is in front of you, and the index line is one line you write at report time. |
+| 2. Fat inline entry -> note + pointer | `delta = -(measured bytes of the entry) + (bytes of the drafted one-line pointer)`. **Draft the pointer before quoting the number** - that is the whole content of the proposal anyway. |
+| 3. Append into an existing note | `0` unless a new index line is needed. Measured, not estimated. |
+| 4. Cross-tier duplicate removal | `-(measured bytes of the inline copy)`. Exact. |
+| 5. Index-line compression | Measure the per-line spread, then `delta = -(sum of current lengths of the over-cap lines) + (cap x count)`. Using the cap as the replacement length is the honest estimate; the real hooks land near it. |
+| 6. Note consolidation | `-(measured bytes of the N-1 index lines being dropped)`. Exact. |
+| 7. Prose -> one line | Draft the replacement line, then `-(measured) + (drafted)`. Never quote this one without drafting. |
+
+The pattern is the same throughout: **the thing being removed is always measurable, so measure it;
+the thing replacing it is always short, so draft it.** A delta quoted without doing both is a guess.
+
+### Mark which rows are measured
+
+Rows whose both halves are measured (tactics 3, 4, 6, and any row where you drafted the replacement)
+are **measured**. Rows where the replacement is an assumed length (tactic 5's cap, or any row where
+you did not draft) are **estimated**. Mark the estimated ones - see `output-format.md` > Zone 2 - so
+a reader knows which figures to trust and the ledger's own confidence is visible.
+
+### A projection is a projection
+
+State plainly that the ledger's projected size is an estimate and that the apply step may need
+another round. Estimates here skew **optimistic**: replacement lines and index entries reliably cost
+more than they look, so a run projected to land just under target frequently lands just over. When
+the projection is within a few thousand chars of the target, say so ("projected 38,172 - close
+enough to target that a second pass may be needed").
+
+After applying, restate the **measured** number rather than letting the projection stand, and
+converge over further passes as needed. Full procedure: `verify-after-apply.md`.
 
 ## Verify after applying
 
-Re-measure and report before -> after -> target. Do not claim a reduction you have not measured:
-
-```bash
-wc -c ~/.claude/CLAUDE.md
-```
-
-Report the real numbers, and if the run ended net-positive or still over target, say so outright
-and offer the next round.
+Two checks, in order: **prove nothing was lost**, then re-measure. Size alone cannot be the proof -
+a relocation whose destination write failed makes the file smaller, so shrinking is also the failure
+signature of data loss. Full procedure, probe selection, and the restore-on-failure rule:
+`verify-after-apply.md`.

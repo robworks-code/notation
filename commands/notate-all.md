@@ -15,4 +15,5 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/commands/notate.md` Step 0 and Steps 1-5 
 - **Skip every `AskUserQuestion`.** Do not ask the strategy question or per-tier multi-selects. Treat every proposal as approved.
 - **Apply all proposals**, keeping each content change atomic with its index update (a note with its Topical Notes Index line; a memory file with its `MEMORY.md` pointer).
 - **Back up `~/.claude/CLAUDE.md`** before any inline rule edit, exactly as Step 6 specifies.
+- **Verify anything that removed content**, exactly as Step 6 item 5 specifies. This matters more here than in the interactive flow: no picker reviewed the deletion, so this probe is the only thing standing between a bad `UPDATE` and a silently lost fact. If a probe misses, restore from the backup and report the loss instead of the size win.
 - **Summarize** what was applied, grouped by tier, by absolute path - noting it auto-applied all N proposals. If anything landed in `~/.claude/CLAUDE.md`, **re-measure** it (`wc -c`) and report `<before> -> <after> chars (target 40,000)`, offering a `notation-audit` run if the result is at or over target.
