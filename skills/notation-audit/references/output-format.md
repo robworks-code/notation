@@ -19,10 +19,23 @@ Print the ledger directly under the scorecard - **always** for an audit, and for
 **whenever any proposal touches that file** (an inline rule or a new index line). Measured with
 `wc -c`, never estimated.
 
-    Audit:   CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
-             Proposed:  -21,310 chars -> 38,172 projected (under target)
+    Audit:   ~/.claude/CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
+             Proposed:            -21,310 chars -> 38,172 projected (under target)
 
-    Capture: CLAUDE.md: 38,140 chars -> +214 -> 38,354 projected (target 40,000)
+    Capture: ~/.claude/CLAUDE.md: 38,140 chars -> +214 -> 38,354 projected (target 40,000)
+
+A project `./CLAUDE.md` gets its own line, never folded into the global figure, and only when the
+file exists AND is at 20,000 chars or more (below that it stays silent - that is the normal, healthy
+state and reporting it just adds noise):
+
+    ./CLAUDE.md:         24,180 chars (soft cap 40,000) - fine, no action
+
+Under strict mode the line is **always** printed, at any size, and carries the trigger instead of
+the soft-cap note - `strict (requested)` when the user asked this run, `strict (project memory)`
+when a recorded preference supplied it - so it is never ambiguous which rules produced the project
+findings.
+
+    ./CLAUDE.md:         12,040 chars (strict (requested), target 40,000) -> -1,200 -> 10,840
 
 If the projection is over target, append ` - still over, next lever: <x>` (audit) or
 ` - consider /notation:notate's budget gate, or run notation-audit` (capture) rather than letting
@@ -39,13 +52,19 @@ them by a unique `#`.
 Capture columns: `#`, `title`, `kind`, `conf`, `destination`, and `delta` when the table needs it.
 Audit columns: `#`, `title`, `severity`, `problem`, `delta`.
 
-`delta` is that row's signed effect on `~/.claude/CLAUDE.md` in characters (`-1,840`, `+118`, `0`),
-computed from the diff text. Audit tables always carry it. **A capture table carries it when ANY of
+`delta` is that row's signed effect in characters on **the file that row touches** (`-1,840`,
+`+118`, `0`), computed from the diff text. Audit tables always carry it.
+
+**Deltas never pool across the two CLAUDE.md files.** A global-file row's delta and a project-file
+row's delta are different currencies: only the global ones sum to the global ledger's net figure and
+feed the pre-apply gate. When a report contains any project-file row, add a `file` column to that
+table (values `global` / `project`) and total the two groups separately in the ledger. A report with
+only global rows omits the column. **A capture table carries it when ANY of
 its rows touches that file** - every inline global rule, and every note row that also adds a Topical
 Notes Index line. Delta is a whole-column decision, never per-row: once a table has the column,
 every row in it shows a number, and rows with no CLAUDE.md effect show `0`. A table where no row
-touches the file omits the column entirely. Across the whole report the column sums to the ledger's
-net figure.
+touches either file omits the column entirely. Across the whole report the global-file deltas sum to
+the global ledger's net figure.
 
 Capture example (GLOBAL RULES always carries delta; TOPICAL NOTES carries it here because row 2
 creates a note and therefore an index line, while row 3 appends to a note that is already indexed):

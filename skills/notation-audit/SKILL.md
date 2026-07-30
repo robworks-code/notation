@@ -16,11 +16,13 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 
 ## How to run an audit
 
-1. **Measure first.** `wc -c ~/.claude/CLAUDE.md` and compare against the budget in `references/size-budget.md` (target <= 40,000 chars). Then read `~/.claude/CLAUDE.md`, `Glob` `~/.claude/notes/*.md`, and for the current project locate the memory dir via `ls -d ~/.claude/projects/*/memory 2>/dev/null` and read its `MEMORY.md`.
+1. **Measure first.** `wc -c ~/.claude/CLAUDE.md` (and `wc -c ./CLAUDE.md 2>/dev/null` - test that the file *exists*, not that git tracks it; it is commonly gitignored yet still loaded) and compare against the budgets in `references/size-budget.md`. Then read `~/.claude/CLAUDE.md`, `Glob` `~/.claude/notes/*.md`, and for the current project locate the memory dir via `ls -d ~/.claude/projects/*/memory 2>/dev/null` and read its `MEMORY.md`.
 2. Walk the checklist in `references/audit-checklist.md` and collect findings. If the measured size is over target, keep proposing relocations until the projected size lands under it (or until nothing is left that can move without losing value).
-3. Report findings using the shared format in `references/output-format.md`: a scorecard header (`Audited: ... - <x> move - <y> fix - <z> tidy`) plus the **size ledger** (before -> projected -> target), then one numbered table per severity group (move / fix / tidy) with columns `# - title - severity - problem - delta`, each row referencing a file by absolute path and carrying its signed CLAUDE.md character delta.
+3. Report findings using the shared format in `references/output-format.md`: a scorecard header (`Audited: ... - <x> move - <y> fix - <z> tidy`) plus the **size ledger** (before -> projected -> target), then one numbered table per severity group (move / fix / tidy) with columns `# - title - severity - problem - delta`, each row referencing a file by absolute path and carrying its signed character delta against the file that row touches. Global-file and project-file deltas total separately and are never pooled; only the global total feeds the no-growth gate.
 4. Offer to apply fixes. Apply only what the user approves. Before editing `~/.claude/CLAUDE.md`, back it up: `cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$(date +%Y%m%d-%H%M%S)`.
 5. **Re-measure after applying** (`wc -c ~/.claude/CLAUDE.md`) and report before -> after -> target with real numbers. If the run ended net-positive, or still over target, say so and offer the next round.
+
+**Two files are called CLAUDE.md; they get opposite treatment.** `~/.claude/CLAUDE.md` (global) loads into every prompt of every session and is **strictly** budgeted. A repo's own `./CLAUDE.md` loads only in that repo, so it gets **headroom**: silent under 20,000 chars, one advisory line up to 40,000, and only past that a real (still advisory) finding. There is no no-growth rule for a project file, and its detail relocates to project-local homes (`./.claude/docs/`, the repo's docs, project memory) - never into the global `~/.claude/notes/`. Strict enforcement on a project file happens only when the user asks or a project memory records that preference. Full rules: `references/size-budget.md`.
 
 **The global file must shrink, never grow.** `~/.claude/CLAUDE.md` loads into every prompt, so an audit that leaves it larger than it found it has failed - even if every finding was correct. The applied net character delta must be `<= 0` always, and when the file is over the 40,000-char target the audit must propose enough relocation to get under it. Additive findings (a new index line, a restored description) are legitimate but must be **counted in the ledger and offset** by moves in the same run. Full budget, tactics, and ledger format: `references/size-budget.md`.
 
@@ -28,7 +30,7 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 
 ## What to look for (summary)
 
-- **Over the size budget**: `~/.claude/CLAUDE.md` above ~40,000 chars. This is the finding that sets the run's goal - everything else is scored against it.
+- **Over the size budget**: `~/.claude/CLAUDE.md` above ~40,000 chars. This is the finding that sets the run's goal - everything else is scored against it. (A project `./CLAUDE.md` is scored separately and far more loosely - most never get mentioned.)
 - **CLAUDE.md bloat**: inline entries that are tool/platform/API-specific and belong in `notes/`. These are the highest-value **moves** (relocate every fact, do not trim) - they shrink the every-session prompt without losing anything.
 - **Bloated index hooks**: Topical Notes Index lines that teach instead of route. In a mature setup the index can be a third of the whole file; capping hooks at ~100 chars is often the second-biggest lever.
 - **Orphaned index lines**: a Topical Notes Index entry whose `notes/<topic>.md` file does not exist, or a note file with no index line.

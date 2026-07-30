@@ -22,7 +22,7 @@ The answer maps to a tier. Frequency and breadth push toward CLAUDE.md; specific
    -> **Project memory**: a frontmatter file in `~/.claude/projects/<encoded-cwd>/memory/` + a pointer line in `MEMORY.md`.
 
 4. **Is it a convention the rest of the team/repo needs** (build/test/deploy steps, architecture orientation)?
-   -> **`./CLAUDE.md`** in the project (only if the repo tracks one).
+   -> **`./CLAUDE.md`** in the project (only if the repo already has one).
 
 5. **Is it a large, structured write-up** (a spec, a phase summary, an implementation guide)?
    -> **`./.claude/docs/<name>.md`** in the project.
@@ -40,7 +40,7 @@ Notation is **additive by default**. Existing lines in `~/.claude/CLAUDE.md` and
 
 - **An `UPDATE` may DELETE an existing line ONLY when that line is factually wrong, or a newer learning directly contradicts it.** In that case, the removal *is* the point - the stale fact must go. Otherwise, never remove.
 - **Superseded-but-still-true content is preserved, not overwritten.** If the new learning extends or refines an existing entry, keep the old line and append the new detail (dated - see below) rather than rewriting the line in place.
-- **When an inline CLAUDE.md entry has grown too big, relocate - do not trim.** Move the detail into `notes/<topic>.md` (preserving every fact) and leave a one-line index pointer. Relocation keeps the information; trimming loses it.
+- **When an inline CLAUDE.md entry has grown too big, relocate - do not trim.** For `~/.claude/CLAUDE.md`, move the detail into `notes/<topic>.md` (preserving every fact) and leave a one-line index pointer. For a project `./CLAUDE.md`, move it into a project-local home instead (`./.claude/docs/`, the repo's docs, project memory) - never into the global notes. Relocation keeps the information; trimming loses it.
 - **Prefer `NEW`-append or move-to-notes over `UPDATE`-rewrite.** Reach for an in-place rewrite only for the narrow wrong/contradicted case above. A bias toward `UPDATE` is what silently erases history - default away from it.
 - **Never condense two true facts into one lossy summary.** If both still hold, both stay.
 
@@ -50,6 +50,13 @@ When a removal genuinely is warranted (wrong/contradicted), say so explicitly in
 lost, not that the every-session file only ever gets bigger - relocation to `notes/` is how both
 hold at once. The `notation-audit` skill enforces a hard size budget on that file (net delta `<= 0`
 on every run, target <= 40,000 chars): see `size-budget.md`.
+
+That budget is the **global** file's alone. A project `./CLAUDE.md` loads only in its own repo, so
+it has room to grow - silent under 20,000 chars, advisory to 40,000, and strict only when the user
+asks or a project memory records that preference. When a project file does need to shed weight, its
+detail goes to `./.claude/docs/`, the repo's
+own docs, or project memory - **never to `~/.claude/notes/`**, which would leak one repo's specifics
+into every other session.
 
 ## Recency timestamps
 
