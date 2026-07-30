@@ -7,7 +7,7 @@ repo's own `./CLAUDE.md`**. Never apply one's rules to the other.
 | File | Loads | Budget | Enforcement |
 | --- | --- | --- | --- |
 | `~/.claude/CLAUDE.md` | every prompt of **every** session, in every repo | 40,000 chars | **Strict** - net delta `<= 0` always, reduce until under target |
-| `./CLAUDE.md` | only in the one repo it belongs to | soft, see below | **Advisory** by default; strict only on request |
+| `./CLAUDE.md` | only in the one repo it belongs to | soft, see below | **Advisory** by default; strict on request or recorded preference |
 
 The asymmetry is the point. A line in the global file is paid for in every session you ever run. A
 line in a project CLAUDE.md is paid for only while you are working in that repo, and is usually
@@ -66,9 +66,9 @@ Three bands, measured with `wc -c ./CLAUDE.md`:
   findings. Growing into this band is expected for a large or long-lived codebase.
 - **Over 40,000 - a real finding, severity `move`.** This is the harness's own per-file warning
   threshold, so the file now costs a warning and a meaningful slice of every session in that repo.
-  Propose relocation the same way as for the global file, but into **project-local homes**, and
-  report a projected size. It is still advisory: the user may decline and the audit accepts that
-  without re-raising it.
+  Propose relocation into **project-local homes** (below) using the project-file tactics in
+  "Reduction tactics", and report a projected size. It is still advisory: the user may decline and
+  the audit accepts that without re-raising it.
 
 **Where project detail goes when it does need to move** - never to `~/.claude/notes/`, which is
 global and would pollute every other repo:
@@ -95,8 +95,15 @@ Enforce the global file's rules (net delta `<= 0`, reduce until under target) on
    session inherits it.
 3. **Otherwise: advisory.** The three bands above.
 
-When strict mode is on, say so in the scorecard (`./CLAUDE.md: strict (requested)`) so it is never
-ambiguous which rules produced the findings. A target the user names beats the 40,000 default.
+When strict mode is on, say so in the scorecard so it is never ambiguous which rules produced the
+findings, and name which trigger fired: `strict (requested)` for #1, `strict (project memory)` for
+#2. A target the user names beats the 40,000 default.
+
+**Strict mode overrides the three bands, including the silent one.** A strict run always prints the
+project ledger line and always scores the file, even under 20,000 chars - the whole point of asking
+for strict is to see the number. Under strict, the file's own target is the named one (or 40,000),
+the net delta must be `<= 0`, and findings are real rather than advisory. Relocation still goes to
+project-local homes only; strict changes the *enforcement*, never the *destination*.
 
 ## Additive findings must be offset (global file)
 
@@ -118,13 +125,20 @@ Every audit report carries a ledger, and every proposed row carries its own sign
 against the file it touches (`-1,840`, `+118`, `0`). Compute the deltas from the actual diff text,
 not by feel.
 
+**Deltas are per-file and never pooled.** A row's delta belongs to exactly one file, and the two
+files' deltas total separately. Only global-file deltas feed the global ledger, the no-growth rule,
+and the pre-apply gate; a project-file row's delta feeds the project line alone. When a report
+contains rows of both kinds, say which file each delta is against (see `output-format.md` > Zone 2)
+so a project move can never be read as a global reduction.
+
 ```
 ~/.claude/CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
 Proposed:            -21,310 chars -> 38,172 projected (under target)
 ```
 
 Add a second line **only when the current project has its own `./CLAUDE.md`**, and only when it is
-at 20,000 chars or more - below that it stays silent:
+at 20,000 chars or more - below that it stays silent, unless strict mode is on (a strict run always
+prints the line, at any size):
 
 ```
 ./CLAUDE.md:         24,180 chars (soft cap 40,000) - fine, no action
@@ -136,10 +150,15 @@ combined number would imply a project file can be "paid for" by shrinking the gl
 If a projected number is still over target, state that plainly and name the next-best lever rather
 than quietly stopping.
 
-## Reduction tactics, best first
+## Reduction tactics, best first (global file)
 
 Every tactic below is lossless at the fact level - the information survives, it just stops being
 loaded every session.
+
+**These seven tactics are for `~/.claude/CLAUDE.md` only.** They all move content into
+`~/.claude/notes/` and the Topical Notes Index, which are global - applying them to a project file
+would leak one repo's specifics into every other session. For a project file, use the project-file
+tactics at the end of this section instead.
 
 1. **Subsection -> note.** A whole `##`/`###` subsection about one tool, platform, API, SDK, or
    service moves verbatim into `~/.claude/notes/<topic>.md`, replaced by one index line. Biggest
@@ -163,6 +182,23 @@ loaded every session.
 
 Do NOT reach for: deleting still-true rules, dropping the genuinely global sections (permissions,
 gh/git, shell/PATH, session/harness, workflow, accessibility), or condensing two facts into one.
+
+### Project-file tactics
+
+Same shape, project-local destinations. Preservation applies identically - relocate, never trim.
+
+1. **Subsection -> `./.claude/docs/<name>.md`.** A long-form guide, spec, or phase write-up moves
+   out verbatim, replaced by a one-line pointer in `./CLAUDE.md`. The main lever.
+2. **Section -> the repo's real docs.** Build, setup, and contribution steps usually belong in
+   `README.md` / `CONTRIBUTING.md` / `docs/`, which humans read too. Point at them rather than
+   duplicating.
+3. **Work-specific fact -> project memory.** A fact about the current work rather than a team
+   convention belongs in `~/.claude/projects/<encoded-cwd>/memory/`, indexed by `MEMORY.md`.
+4. **Prose -> one line**, under the same rule as tactic 7 above: only when every distinct fact
+   survives.
+
+There is no project-tier equivalent of the Topical Notes Index, so a project relocation costs no
+index line - the one-line pointer in `./CLAUDE.md` is the whole overhead.
 
 ## Projecting savings honestly
 

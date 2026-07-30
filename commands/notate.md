@@ -60,16 +60,18 @@ echo "transcript: $tx"
 If `$tx` exists, scan it (do NOT dump the whole file) for the high-signal moments: a command that failed then succeeded, an error string and its resolution, a flag or invocation that got corrected, and any place the user corrected how you worked. `grep -nE '"type":"(user|tool_result)"' "$tx"` and targeted `grep -i` for `error|denied|failed|instead|actually|don.t` are good entry points. Treat recall as primary and the transcript as the safety net.
 
 **Project profile (where things belong + what is already known):**
-- `./CLAUDE.md` if the repo tracks one (team conventions already recorded).
+- `./CLAUDE.md` if the repo has one (team conventions already recorded).
 - The per-project memory dir's `MEMORY.md` (see Step 5 for how to locate it).
 - `git log --oneline -10` and a glance at the project type/structure.
 
 This profile is what makes dedup real instead of guessed, and what lets you tell a global rule apart from a this-project fact.
 
-**Global file headroom (one command, always run it):**
+**File headroom (one command, always run it):**
 ```bash
-wc -c ~/.claude/CLAUDE.md
+wc -c ~/.claude/CLAUDE.md; wc -c ./CLAUDE.md 2>/dev/null
 ```
+The second measurement is what Steps 3 and 6 branch on - take the file's existence as the test, not whether git tracks it (it is commonly gitignored yet still loaded). If there is no `./CLAUDE.md`, there is nothing to report and the project-file rules simply do not apply.
+
 `~/.claude/CLAUDE.md` loads into every prompt of every session, so it is budgeted: target **<= 40,000 chars** (Claude Code's large-memory-file warning floor). Carry the measured number into Step 3's budget gate and Step 6's scorecard. Full budget: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/size-budget.md`.
 
 **This budget is the GLOBAL file's alone.** A repo's own `./CLAUDE.md` loads only inside that repo, has a soft cap of 40,000 with a silent band under 20,000, and is never gated by Step 3. Adding to a project CLAUDE.md is normal and needs no justification.
@@ -104,7 +106,7 @@ Assign every proposal's **tier**:
 | High-frequency, cross-project, fires almost every session (permission/CLI/session quirks) | **Global rules** | `~/.claude/CLAUDE.md` (inline) |
 | Situational, tied to one tool / platform / API / SDK / service; useful only when that thing comes up | **Topical note** | `~/.claude/notes/<topic>.md` + a line in the Topical Notes Index |
 | Specific to THIS project's architecture, decisions, gotchas, or workflow; not in the code | **Project memory** | this project's `MEMORY.md` + a frontmatter memory file |
-| A team-shared convention others on the repo need | **Project CLAUDE.md** | `./CLAUDE.md` (only if the repo tracks one) |
+| A team-shared convention others on the repo need | **Project CLAUDE.md** | `./CLAUDE.md` (only if the repo already has one) |
 | A large guide / spec / phase write-up | **Project docs** | `./.claude/docs/<name>.md` |
 
 **Lean bias (the whole point):** if a learning is tool- or platform-specific, it goes to `notes/`, NOT inline into CLAUDE.md - even if it feels important. Only promote to global CLAUDE.md when it genuinely applies regardless of what you are working on. When in doubt, prefer `notes/` or project memory over CLAUDE.md.
@@ -116,7 +118,7 @@ Assign every proposal's **tier**:
 - **When the measured size from Step 1 is at or over 40,000 chars, the global tier is closed by default.** Re-ask the routing question with a hostile eye: if there is any plausible topic file, route it to `notes/` instead. Promote inline only if the rule genuinely fires regardless of what you are working on AND you say so in the proposal's `why`, naming the size ("CLAUDE.md is at 59,482 - promoting anyway because ...").
 - **A note is not free either**: a new note also costs an index line in CLAUDE.md, so prefer appending to an existing topic file (Step 4 checks this).
 - If the file is over target, add one line to the Step 6 summary offering a `notation-audit` run to reclaim space. Do not silently push a file further over its budget.
-- **None of this applies to a project `./CLAUDE.md`.** Route a team-shared convention there without a budget argument - it costs context only in its own repo. Only mention its size if it is already past 40,000 chars, and then as a note, not a blocker.
+- **None of this applies to a project `./CLAUDE.md`.** Route a team-shared convention there without a budget argument - it costs context only in its own repo. Report its measured size only from 20,000 chars up (one ledger line, per `output-format.md`), and past 40,000 add one sentence suggesting a `notation-audit` run - as a note, never a blocker.
 
 ## Step 4 - Dedup against the destination (targeted reads only)
 
