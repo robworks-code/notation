@@ -33,7 +33,7 @@ Read `~/.claude/CLAUDE.md`. For each inline entry or subsection, ask the routing
 - A whole subsection about a single service is a strong signal: it should usually be a note with a one-line index entry instead.
 - A multi-line inline entry that survives the routing question can still shed its detail: keep the **trigger** inline as one line and move the commands, error strings, and recipe into a note (`size-budget.md` tactic 2).
 - Prefer appending to an existing note over creating a new one - a new note also costs a new index line.
-- **Report the win in characters, not vibes**: each finding's delta is the byte count of the lines leaving CLAUDE.md, minus any index line it adds.
+- **Report the win in characters, not vibes**: each finding's delta is the measured byte count of the lines leaving CLAUDE.md, minus the **drafted** replacement (the pointer line, the index line). Draft the replacement at report time - it is one line, and it is the substance of the proposal anyway - so both halves of the number are real. Per-tactic methods: `size-budget.md` > "Every row's delta needs a method".
 - The fix is **relocation, not deletion** - the bytes leave CLAUDE.md but land intact in the note. Do not propose dropping detail on the way.
 
 Do NOT flag the genuinely global sections (permissions, gh/git quirks, shell/PATH gotchas, session/harness behavior, workflow preferences, accessibility requirements).
@@ -102,10 +102,14 @@ Render the report with the shared format in `output-format.md`: a scorecard head
 
 ## Verify
 
-After applying, re-measure and report the real before -> after -> target numbers:
+Two checks after applying, in this order. Full procedure: `verify-after-apply.md`.
+
+**1. Preservation checks (can fail the run).** For every applied **relocation** - not a compression; tactics 5 and 7 rewrite in place and must not be probed - confirm two things. First, the destination file **grew by at least the byte count that left the source**; a shortfall is a partial write that no point probe can catch. Second, 1-2 distinctive strings picked *before* applying (an error string, a sha, a flag, a number - never a common word, and never one spanning a line break) now hit their own destination file with `/usr/bin/grep -c -F`, and are **gone from the source** - the inverse failure, where the append lands but the removal does not, otherwise passes silently as an under-delivering estimate. Assert the preconditions beforehand: present in the source block, absent from the destination, and absent from every other block moving in the same run. Report the tally over relocations, not strings (`Preservation: 16/16 relocations verified`). On any miss, restore **that** relocation from its snapshot, say which one lost content, and do **not** report the size reduction as a success.
+
+**2. Re-measure.** Only once the probes pass:
 
 ```bash
 wc -c ~/.claude/CLAUDE.md
 ```
 
-Never claim a reduction from the projection alone. If the measured result grew, or is still over target, state it plainly and offer the next round.
+Never claim a reduction from the projection alone. If the measured result grew, or is still over target, state it plainly and offer the next round - re-running the checklist over what remains, since the biggest lever usually moves once the file changes. Landing under target in one pass is not the expectation; converging over two or three is normal.

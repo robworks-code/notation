@@ -95,7 +95,7 @@ Turn each survivor into a **proposal** with these fields - you will reuse them v
 - **kind** - `NEW` (add) or `UPDATE` (edit an existing entry in place)
 - **confidence** - high / med / low (how sure you are it recurs and is correctly placed)
 - **diff** - the concrete text to add or change, and the exact destination path
-- **delta** - the proposal's signed character effect on `~/.claude/CLAUDE.md`, counted from the diff text. Non-zero for an inline global rule and for a new note (which costs a Topical Notes Index line); `0` for everything else. Step 3's budget gate and Step 6's tables and ledger both read this field.
+- **delta** - the proposal's signed character effect on `~/.claude/CLAUDE.md`, counted from the diff text you have already drafted (capture always has its diff in hand, so this number is measured, not estimated). Non-zero for an inline global rule and for a new note (which costs a Topical Notes Index line); `0` for everything else. Step 3's budget gate and Step 6's tables and ledger both read this field.
 
 ## Step 3 - Route each learning (do NOT dump)
 
@@ -171,7 +171,7 @@ If the learning is already covered, drop the proposal - do not restate it. If it
 
 First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. **If any proposal touches `~/.claude/CLAUDE.md`** (an inline rule or a new index line), the scorecard also carries the size ledger from Step 1's measurement: `CLAUDE.md: <measured> chars -> +<cost> -> <projected> (target 40,000)`. Each diff body goes in a ` ```diff ` fenced block so `+`/`-` lines render with color coding. The diffs must appear above the questions because the picker's multi-select has no preview pane.
 
-**Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (atomic content+index writes), item 4 (CLAUDE.md backup), and item 5 (summary). The summary should note it auto-applied all N proposals, and must include the re-measured CLAUDE.md size - nothing else reviews the global tier in this mode.
+**Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (back up every file that will lose content), item 4 (atomic content+index writes), item 5 (verify anything that removed content), and item 6 (summary). The summary should note it auto-applied all N proposals, and must include the re-measured CLAUDE.md size - nothing else reviews the global tier in this mode.
 
 Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform:
 
@@ -184,17 +184,22 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 
 2. **If `Review by tier`:** for each tier with proposals, ask one **multi-select** question whose options are that tier's proposal titles (with the why as each option's description). If a tier has more than 4 proposals, ask it in successive batches of 4 (the tool caps options at 4). Checked options are applied; unchecked are dropped.
 
-3. **Apply only the approved proposals.** Keep each content change atomic with its index update:
+3. **Back up every file that will lose content - before writing anything.** Snapshot `~/.claude/CLAUDE.md` if an approved change edits its rules inline, and equally any note or memory file an approved `UPDATE` will delete a line from. Use one stamp for the whole run:
+   ```bash
+   stamp=$(date +%Y%m%d-%H%M%S)
+   cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp
+   ```
+   A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.
+
+4. **Then apply the approved proposals.** Keep each content change atomic with its index update:
    - a note edit/create together with its Topical Notes Index line,
    - a memory file together with its `MEMORY.md` pointer.
 
-4. **Back up before editing global CLAUDE.md.** If (and only if) an approved change edits `~/.claude/CLAUDE.md` rules inline, snapshot it first:
-   ```bash
-   cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$(date +%Y%m%d-%H%M%S)
-   ```
-   No backup needed for notes (incl. the index line), memory, or project files.
+   If a proposal removes content, **pick its probe string now, before the removal**, and confirm two things while you still can: the string is present in the text being removed, and absent from the destination. A probe chosen after the fact cannot establish either, and the second condition is the one that stops a stale copy in the destination from producing a false pass.
 
-5. **Summary.** Report what was applied and what was skipped, grouped by tier, referencing files by absolute path.
+5. **Verify anything that removed content.** Most capture is purely additive and needs no check. But if an approved proposal **deleted or relocated** an existing line (an `UPDATE` carrying `-` lines, or a rewrite that moved detail into a note), prove the content survived before reporting success: confirm the probe string from item 4 now appears in the destination with `/usr/bin/grep -c -F '<string>' <destination>`, and that it is gone from the source. If either check fails, restore that file from its item-3 snapshot and say so. Shrinking a file is the failure signature of a lost fact, so never let a size number stand in for this. A rewrite that legitimately *reworded* content is a compression, not a relocation - do not probe it; hold it to the standard that every distinct fact survives in the shorter text. Full procedure: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/verify-after-apply.md`.
+
+6. **Summary.** Report what was applied and what was skipped, grouped by tier, referencing files by absolute path.
 
    **If anything landed in `~/.claude/CLAUDE.md`, re-measure it and print the real number** - `wc -c ~/.claude/CLAUDE.md` - as `CLAUDE.md: <before> -> <after> chars (target 40,000)`. Never report growth from the projection alone. If the after-size is at or over target, add one line offering a `notation-audit` run to reclaim space by relocating detail into notes. This matters most in auto-apply mode, where no picker stood between the proposal and the file.
 

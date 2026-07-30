@@ -20,7 +20,7 @@ Print the ledger directly under the scorecard - **always** for an audit, and for
 `wc -c`, never estimated.
 
     Audit:   ~/.claude/CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
-             Proposed:            -21,310 chars -> 38,172 projected (under target)
+             Proposed:            -21,310 chars -> 38,172 projected (under target, estimate)
 
     Capture: ~/.claude/CLAUDE.md: 38,140 chars -> +214 -> 38,354 projected (target 40,000)
 
@@ -39,8 +39,21 @@ findings.
 
 If the projection is over target, append ` - still over, next lever: <x>` (audit) or
 ` - consider /notation:notate's budget gate, or run notation-audit` (capture) rather than letting
-the number pass without comment. After applying, print the ledger again with the **re-measured**
-after-size - never claim a size you have not measured.
+the number pass without comment.
+
+**A projected line is an estimate and must read as one.** Say `projected`, never a bare figure that
+could pass for a measurement, and when the projection lands within a few thousand chars of target,
+add that a second pass may be needed - estimates here skew optimistic. See `size-budget.md` >
+"A projection is a projection".
+
+After applying, print the ledger again with the **re-measured** after-size - never claim a size you
+have not measured - and print the preservation tally on its own line above it:
+
+    Preservation: 16/16 relocations verified (bytes conserved, probes hit, sources clean).
+    ~/.claude/CLAUDE.md: 59,482 -> 39,887 chars (target 40,000) - under, after 4 passes
+
+If any probe failed, that line replaces the size line entirely: name the move that lost content,
+state that the file was restored from the backup, and do not present a reduction as a result.
 
 ## Zone 2 - Per-tier tables
 
@@ -53,7 +66,10 @@ Capture columns: `#`, `title`, `kind`, `conf`, `destination`, and `delta` when t
 Audit columns: `#`, `title`, `severity`, `problem`, `delta`.
 
 `delta` is that row's signed effect in characters on **the file that row touches** (`-1,840`,
-`+118`, `0`), computed from the diff text. Audit tables always carry it.
+`+118`, `0`). Audit tables always carry it. Compute it by measuring the content being removed and
+**drafting** the line replacing it - never by feel; the per-tactic methods are in `size-budget.md` >
+"Every row's delta needs a method". Mark a row whose replacement length was assumed rather than
+drafted with a trailing `~` (`-3,610~`), so an estimated figure is never read as a measured one.
 
 **Deltas never pool across the two CLAUDE.md files.** A global-file row's delta and a project-file
 row's delta are different currencies: only the global ones sum to the global ledger's net figure and
@@ -78,12 +94,13 @@ creates a note and therefore an index line, while row 3 appends to a note that i
       2  railway bucket TTL   NEW    high   ~/.claude/notes/railway.md   +118
       3  supabase RLS gotcha  NEW    med    ~/.claude/notes/supabase.md     0
 
-Audit example:
+Audit example (row 1 drafted its replacement pointer, so both halves are measured; row 2 assumes the
+~100-char cap as the replacement length, so it carries the `~` estimate marker):
 
     MOVE
       #  title                    severity   problem                                    delta
       1  gcloud subsection        move       tool-specific, belongs in notes/gcloud.md   -1,840
-      2  index hooks over 100ch   move       31 lines teach instead of route             -3,610
+      2  index hooks over 100ch   move       31 lines teach instead of route             -3,610~
 
     FIX
       #  title                    severity   problem                                    delta
