@@ -85,20 +85,28 @@ if len(blocks) == 1:
 print("\nscope-resolution: no wildcard project resolution")
 # A `projects/*/memory` glob matches every project on the machine, so it can
 # never identify THE current one. This test file names the pattern in order to
-# ban it, so tests/ is excluded from its own scan - and scope-resolution.md is
-# excluded too, since it must name the same anti-pattern in prose to warn
-# against it (see its "Never resolve with a `*` glob" paragraph).
+# ban it, so tests/ is excluded from its own scan. scope-resolution.md also
+# must name the pattern once, in prose, to warn against it - but that
+# exemption is scoped to the ONE line that does so, not the whole file, so
+# any OTHER line in scope-resolution.md that reintroduces the glob (e.g. as
+# real advice added later) is still caught.
 REFERENCE_REL = os.path.relpath(REFERENCE, REPO)
+EXEMPT_LINE = (
+    "**Never resolve with a `*` glob.** `ls -d ~/.claude/projects/*/memory` "
+    "matches every"
+)
 tracked = subprocess.run(
     ["git", "ls-files"], cwd=REPO, capture_output=True, text=True
 ).stdout.split()
 offenders = []
 for rel in tracked:
-    if rel.startswith("tests/") or rel == REFERENCE_REL or not rel.endswith(".md"):
+    if rel.startswith("tests/") or not rel.endswith(".md"):
         continue
     body = open(os.path.join(REPO, rel), encoding="utf-8").read()
     for i, line in enumerate(body.splitlines(), 1):
         if re.search(r"projects/\*", line):
+            if rel == REFERENCE_REL and line.strip() == EXEMPT_LINE:
+                continue
             offenders.append(f"{rel}:{i}: {line.strip()}")
 check(
     "no shipped file resolves a project with a glob",
