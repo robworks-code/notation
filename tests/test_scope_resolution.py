@@ -106,6 +106,21 @@ check(
     "; ".join(offenders),
 )
 
+print("\nscope-resolution: no drift between copies of the canonical block")
+NOTATE = os.path.join(REPO, "commands", "notate.md")
+copies = canonical_block(NOTATE)
+check(
+    "commands/notate.md carries exactly one canonical block",
+    len(copies) == 1,
+    f"found {len(copies)}",
+)
+if len(blocks) == 1 and len(copies) == 1:
+    check(
+        "notate.md's block is byte-identical to the reference's",
+        copies[0] == blocks[0],
+        "the two copies have drifted",
+    )
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} check(s): {', '.join(failures)}")
