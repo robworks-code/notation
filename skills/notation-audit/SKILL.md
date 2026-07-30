@@ -39,6 +39,7 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 - **Cross-tier duplication**: the same fact living in two tiers - keep the more specific copy, drop the redundant one.
 - **Missing recency dates**: new-style notes entries or memory files lacking a date; nudge new additions toward `(YYYY-MM-DD)` / `metadata.updated`.
 - **Backup clutter**: stale `~/.claude/CLAUDE.md.bak.*` snapshots the user may want to prune (keep the most recent one or two - they are the preservation safety net).
+- **Scope leakage**: a global `notes/` file whose subject is really one repo, or a project memory file holding a fact that is true everywhere. Both directions leak; see `references/audit-checklist.md` check 9.
 
 **Size is the half of the verification that lies.** A relocation is two writes - remove from CLAUDE.md, append to the note - so if the append fails while the removal succeeds, the file gets *smaller* and every size check passes. Shrinking is the failure signature of data loss. Never finish a run on `wc -c` alone: prove each moved block reached its destination (bytes conserved, probe hits, source clean) before reporting any size number, and restore that relocation if it did not. Procedure: `references/verify-after-apply.md`.
 
