@@ -66,6 +66,12 @@ If `$tx` exists, scan it (do NOT dump the whole file) for the high-signal moment
 
 This profile is what makes dedup real instead of guessed, and what lets you tell a global rule apart from a this-project fact.
 
+**Global file headroom (one command, always run it):**
+```bash
+wc -c ~/.claude/CLAUDE.md
+```
+`~/.claude/CLAUDE.md` loads into every prompt of every session, so it is budgeted: target **<= 40,000 chars** (Claude Code's large-memory-file warning floor). Carry the measured number into Step 3's budget gate and Step 6's scorecard. Full budget: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/size-budget.md`.
+
 ## Step 2 - Extract candidate learnings as structured proposals
 
 From the picture above, list the candidate learnings. Look for:
@@ -85,6 +91,7 @@ Turn each survivor into a **proposal** with these fields - you will reuse them v
 - **kind** - `NEW` (add) or `UPDATE` (edit an existing entry in place)
 - **confidence** - high / med / low (how sure you are it recurs and is correctly placed)
 - **diff** - the concrete text to add or change, and the exact destination path
+- **delta** - the proposal's signed character effect on `~/.claude/CLAUDE.md`, counted from the diff text. Non-zero for an inline global rule and for a new note (which costs a Topical Notes Index line); `0` for everything else. Step 3's budget gate and Step 6's tables and ledger both read this field.
 
 ## Step 3 - Route each learning (do NOT dump)
 
@@ -99,6 +106,14 @@ Assign every proposal's **tier**:
 | A large guide / spec / phase write-up | **Project docs** | `./.claude/docs/<name>.md` |
 
 **Lean bias (the whole point):** if a learning is tool- or platform-specific, it goes to `notes/`, NOT inline into CLAUDE.md - even if it feels important. Only promote to global CLAUDE.md when it genuinely applies regardless of what you are working on. When in doubt, prefer `notes/` or project memory over CLAUDE.md.
+
+**Budget gate (applies to every global-tier proposal).** Capture is the only thing that grows `~/.claude/CLAUDE.md`; the audit can only claw back what capture adds. So every proposal routed to the global tier must pay for its characters:
+
+- **Compute its character cost** from the diff text into the proposal's `delta` field (Step 2), and carry that into the tables and the scorecard.
+- **Keep the inline line to one line.** If the learning needs more than that, the trigger goes inline and the detail goes to `notes/<topic>.md` - inline prose is the main way this file drifts.
+- **When the measured size from Step 1 is at or over 40,000 chars, the global tier is closed by default.** Re-ask the routing question with a hostile eye: if there is any plausible topic file, route it to `notes/` instead. Promote inline only if the rule genuinely fires regardless of what you are working on AND you say so in the proposal's `why`, naming the size ("CLAUDE.md is at 59,482 - promoting anyway because ...").
+- **A note is not free either**: a new note also costs an index line in CLAUDE.md, so prefer appending to an existing topic file (Step 4 checks this).
+- If the file is over target, add one line to the Step 6 summary offering a `notation-audit` run to reclaim space. Do not silently push a file further over its budget.
 
 ## Step 4 - Dedup against the destination (targeted reads only)
 
@@ -143,15 +158,15 @@ If the learning is already covered, drop the proposal - do not restate it. If it
 - Pair every memory file with a one-line pointer in that dir's `MEMORY.md`: `- [Title](file.md) - hook`. Never put the fact body in `MEMORY.md`; it is the index only.
 - **Editing an existing memory file is append/refine, not replace.** Keep still-true content; only drop a line that is wrong or contradicted, and bump `updated:` when you do.
 
-**Global CLAUDE.md rule:** one line per concept, in the most relevant existing section. Format `` `<command/pattern>` - <brief note> ``. No verbose prose. Do not date inline rules - the every-session file stays clean. Add a rule; never silently rewrite or drop an existing one unless it is wrong or contradicted (see Step 4 / Preservation).
+**Global CLAUDE.md rule:** one line per concept, in the most relevant existing section. Format `` `<command/pattern>` - <brief note> ``. No verbose prose. Do not date inline rules - the every-session file stays clean. Add a rule; never silently rewrite or drop an existing one unless it is wrong or contradicted (see Step 4 / Preservation). Report the line's character cost with the diff, and honor the Step 3 budget gate - if it will not fit in one line, the detail goes to a note and only the trigger stays inline.
 
 **Project CLAUDE.md / docs:** match the file's existing style.
 
 ## Step 6 - Present, then apply through the interactive picker
 
-First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. Each diff body goes in a ` ```diff ` fenced block so `+`/`-` lines render with color coding. The diffs must appear above the questions because the picker's multi-select has no preview pane.
+First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. **If any proposal touches `~/.claude/CLAUDE.md`** (an inline rule or a new index line), the scorecard also carries the size ledger from Step 1's measurement: `CLAUDE.md: <measured> chars -> +<cost> -> <projected> (target 40,000)`. Each diff body goes in a ` ```diff ` fenced block so `+`/`-` lines render with color coding. The diffs must appear above the questions because the picker's multi-select has no preview pane.
 
-**Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (atomic content+index writes), item 4 (CLAUDE.md backup), and item 5 (summary). The summary should note it auto-applied all N proposals.
+**Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (atomic content+index writes), item 4 (CLAUDE.md backup), and item 5 (summary). The summary should note it auto-applied all N proposals, and must include the re-measured CLAUDE.md size - nothing else reviews the global tier in this mode.
 
 Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform:
 
@@ -175,6 +190,8 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
    No backup needed for notes (incl. the index line), memory, or project files.
 
 5. **Summary.** Report what was applied and what was skipped, grouped by tier, referencing files by absolute path.
+
+   **If anything landed in `~/.claude/CLAUDE.md`, re-measure it and print the real number** - `wc -c ~/.claude/CLAUDE.md` - as `CLAUDE.md: <before> -> <after> chars (target 40,000)`. Never report growth from the projection alone. If the after-size is at or over target, add one line offering a `notation-audit` run to reclaim space by relocating detail into notes. This matters most in auto-apply mode, where no picker stood between the proposal and the file.
 
 Never edit `~/.claude/settings.json` (the harness self-grant guard blocks it, and it is not a notation target).
 

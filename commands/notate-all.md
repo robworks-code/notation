@@ -10,8 +10,9 @@ This is `/notation:notate` in auto-apply mode: capture this session's learnings,
 
 Read and follow `${CLAUDE_PLUGIN_ROOT}/commands/notate.md` Step 0 and Steps 1-5 exactly (session read + flow shaping, session + project grounding, extracting proposals, routing, dedup, tier-specific formatting). In auto-apply mode Step 0 still applies for **session type, tier focus, and early-exit** - if the read finds nothing worth saving, say so and stop - but it must **never reintroduce a picker**. Then run Step 6 in **auto-apply mode**:
 
-- **Print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md` (scorecard header, numbered per-tier tables, diffs below keyed by row number) - the same printout Step 6 calls for.
+- **Print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md` (scorecard header, numbered per-tier tables, diffs below keyed by row number) - the same printout Step 6 calls for. If any proposal touches `~/.claude/CLAUDE.md`, include the size ledger.
+- **Honor Step 3's budget gate.** No picker stands between a proposal and the file here, so the gate is the only thing keeping the every-session file from drifting: if Step 1 measured `~/.claude/CLAUDE.md` at or over 40,000 chars, the global tier is closed by default and borderline learnings route to `notes/` instead.
 - **Skip every `AskUserQuestion`.** Do not ask the strategy question or per-tier multi-selects. Treat every proposal as approved.
 - **Apply all proposals**, keeping each content change atomic with its index update (a note with its Topical Notes Index line; a memory file with its `MEMORY.md` pointer).
 - **Back up `~/.claude/CLAUDE.md`** before any inline rule edit, exactly as Step 6 specifies.
-- **Summarize** what was applied, grouped by tier, by absolute path - noting it auto-applied all N proposals.
+- **Summarize** what was applied, grouped by tier, by absolute path - noting it auto-applied all N proposals. If anything landed in `~/.claude/CLAUDE.md`, **re-measure** it (`wc -c`) and report `<before> -> <after> chars (target 40,000)`, offering a `notation-audit` run if the result is at or over target.

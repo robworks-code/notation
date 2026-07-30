@@ -14,6 +14,21 @@ separator and `->` for routing.
 
 If a tier has zero items, omit it from the tally rather than printing `0`.
 
+**The size ledger.** `~/.claude/CLAUDE.md` is budgeted at <= 40,000 chars (see `size-budget.md`).
+Print the ledger directly under the scorecard - **always** for an audit, and for a capture run
+**whenever any proposal touches that file** (an inline rule or a new index line). Measured with
+`wc -c`, never estimated.
+
+    Audit:   CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
+             Proposed:  -21,310 chars -> 38,172 projected (under target)
+
+    Capture: CLAUDE.md: 38,140 chars -> +214 -> 38,354 projected (target 40,000)
+
+If the projection is over target, append ` - still over, next lever: <x>` (audit) or
+` - consider /notation:notate's budget gate, or run notation-audit` (capture) rather than letting
+the number pass without comment. After applying, print the ledger again with the **re-measured**
+after-size - never claim a size you have not measured.
+
 ## Zone 2 - Per-tier tables
 
 One compact table per non-empty tier (or per severity group, for audit). Order rows
@@ -21,25 +36,39 @@ high-confidence first (capture) or move -> fix -> tidy (audit). Number rows cont
 all tier tables (do not reset to 1 per tier) so the picker and the diffs below can reference
 them by a unique `#`.
 
-Capture columns: `#`, `title`, `kind`, `conf`, `destination`.
-Audit columns: `#`, `title`, `severity`, `problem`.
+Capture columns: `#`, `title`, `kind`, `conf`, `destination`, and `delta` when the table needs it.
+Audit columns: `#`, `title`, `severity`, `problem`, `delta`.
 
-Capture example:
+`delta` is that row's signed effect on `~/.claude/CLAUDE.md` in characters (`-1,840`, `+118`, `0`),
+computed from the diff text. Audit tables always carry it. **A capture table carries it when ANY of
+its rows touches that file** - every inline global rule, and every note row that also adds a Topical
+Notes Index line. Delta is a whole-column decision, never per-row: once a table has the column,
+every row in it shows a number, and rows with no CLAUDE.md effect show `0`. A table where no row
+touches the file omits the column entirely. Across the whole report the column sums to the ledger's
+net figure.
+
+Capture example (GLOBAL RULES always carries delta; TOPICAL NOTES carries it here because row 2
+creates a note and therefore an index line, while row 3 appends to a note that is already indexed):
 
     GLOBAL RULES
-      #  title               kind   conf   destination
-      1  gh merge wildcard    NEW    high   ~/.claude/CLAUDE.md
+      #  title               kind   conf   destination           delta
+      1  gh merge wildcard    NEW    high   ~/.claude/CLAUDE.md    +94
 
     TOPICAL NOTES
-      #  title               kind   conf   destination
-      2  railway bucket TTL   NEW    high   ~/.claude/notes/railway.md
-      3  supabase RLS gotcha  NEW    med    ~/.claude/notes/supabase.md
+      #  title               kind   conf   destination                  delta
+      2  railway bucket TTL   NEW    high   ~/.claude/notes/railway.md   +118
+      3  supabase RLS gotcha  NEW    med    ~/.claude/notes/supabase.md     0
 
 Audit example:
 
     MOVE
-      #  title                    severity   problem
-      1  gcloud subsection        move       tool-specific, belongs in notes/gcloud.md
+      #  title                    severity   problem                                    delta
+      1  gcloud subsection        move       tool-specific, belongs in notes/gcloud.md   -1,840
+      2  index hooks over 100ch   move       31 lines teach instead of route             -3,610
+
+    FIX
+      #  title                    severity   problem                                    delta
+      3  pytest.md unindexed      fix        note exists with no index line              +112
 
 ## Zone 3 - Diffs below
 
