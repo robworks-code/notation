@@ -111,6 +111,12 @@ Turn each survivor into a **proposal** with these fields - you will reuse them v
 
 Assign every proposal's **tier**:
 
+**Decide scope before tier.** Ask "does this stop being true in another repo?" first. A
+yes routes to the project rows below and never to the global ones, even when the learning
+is tool-shaped - that combination is exactly how one repo's detail ends up in
+`~/.claude/notes/`. Full rule:
+`${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/scope-resolution.md`.
+
 | Signal | Tier | Destination |
 | --- | --- | --- |
 | High-frequency, cross-project, fires almost every session (permission/CLI/session quirks) | **Global rules** | `~/.claude/CLAUDE.md` (inline) |

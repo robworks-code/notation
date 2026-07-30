@@ -8,6 +8,22 @@ The full decision tree for placing a learning. Used by `/notation:notate` when c
 
 The answer maps to a tier. Frequency and breadth push toward CLAUDE.md; specificity pushes toward notes or memory.
 
+## Step 0 - decide the scope first
+
+Before the tree below, ask:
+
+> Does this stop being true when I switch to another repo?
+
+- **Yes -> project scope.** Skip branches 1 and 2 entirely; choose among branches 3, 4
+  and 5 only.
+- **No -> global scope.** Branches 1 and 2 apply.
+
+Running the tree first is what produces a scope leak, because a learning can be
+tool-shaped **and** repo-bound at once: "our Railway service needs its bucket TTL set at
+create time" is a Railway fact, so branch 2 files it in the global `notes/railway.md`,
+where every other repo's session then loads one repo's deployment detail. Full rule,
+the mirror case, and the never-cross list: `scope-resolution.md`.
+
 ## Decision tree
 
 1. **Does it apply almost every session, regardless of what I am working on?**
@@ -32,7 +48,10 @@ The answer maps to a tier. Frequency and breadth push toward CLAUDE.md; specific
 - **Lean bias.** When a learning could plausibly go inline OR into notes, choose notes. CLAUDE.md loads into every prompt; every line there has a recurring cost. Notes load only on demand.
 - **Specific beats general.** "Railway buckets need TTL set at create time" is a Railway note, not a global rule, even though it felt important in the moment.
 - **One fact, one place.** Do not mirror the same fact across tiers. If it is already in notes, do not also inline it.
-- **Project vs global.** If the fact stops being true when you switch repos, it is project memory, not global.
+- **Project vs global is a scope question, not a tie-break.** It is settled in Step 0
+  above, before the tree runs - not as a nudge afterwards. If the fact stops being true
+  when you switch repos, it is project-scoped, and a tool-shaped surface does not change
+  that. See `scope-resolution.md`.
 
 ## Preservation (never destroy history)
 
