@@ -107,6 +107,8 @@ When strict is on it **replaces all three bands**, including the silent one: alw
 
 Content in the scope that does not match the fact. Both directions are real, and neither is caught by any check above. Full definitions and the never-cross list: `scope-resolution.md`.
 
+When the fact appears in only one location (the wrong scope) - if it already exists in both scopes, check 5 handles the mismatch instead:
+
 - **A global note whose subject is one repo.** `~/.claude/notes/<topic>.md` is about a tool, platform, API, SDK, or service. Signals: the note names a repo, a repo-local path, a service name that exists only in one project, or a deployment detail true of exactly one deploy. Flag to **move** into that project's memory (or `./.claude/docs/` if it is long-form), leaving the genuinely tool-general parts behind. Only propose this when the project is identifiable - if the note does not say which repo it belongs to, flag it `tidy` and ask, rather than guessing a destination.
 - **Project memory holding a global fact.** A memory file that would stay true in any repo belongs in `~/.claude/notes/` or, if it fires every session, inline. Flag to move and drop the `MEMORY.md` pointer with it.
 - **A project fact duplicated into a global note.** Handled as check 5's cross-scope case; count it there, not twice.
