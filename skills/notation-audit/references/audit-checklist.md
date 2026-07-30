@@ -4,7 +4,9 @@ Walk these checks in order. For each finding, record the file path, the problem,
 
 **Preservation first (applies to every fix below).** Notation is additive. Prefer **relocating** content (CLAUDE.md -> notes/, preserving every fact) over trimming it, and **appending** over rewriting. A fix may DELETE an existing line only when that line is factually wrong or directly contradicted by newer notation - and then the finding must name the removal. Never flag a still-true line for deletion just to save space; relocate it instead. See `routing-rubric.md` > "Preservation". Losing a hard-won line is a worse outcome than a slightly long file.
 
-**Net size must not grow (applies to every fix below).** Preservation is not a licence to grow the every-session file. Each finding carries a signed CLAUDE.md character delta, and the run's total must be `<= 0`; when the file is over target the total must be negative enough to land under it. Additive findings (check 2, and any promoted global rule) must be offset by moves in the same run. Full budget and tactics: `size-budget.md`.
+**Net size of the GLOBAL file must not grow (applies to every fix below).** Preservation is not a licence to grow the every-session file. Each finding carries a signed character delta against `~/.claude/CLAUDE.md`, and the run's total must be `<= 0`; when the file is over target the total must be negative enough to land under it. Additive findings (check 2, and any promoted global rule) must be offset by moves in the same run. Full budget and tactics: `size-budget.md`.
+
+**This rule is about `~/.claude/CLAUDE.md` only.** A project's own `./CLAUDE.md` has a soft, advisory budget with real headroom - see check 8. Checks 1, 2 and 5 below all operate on the global file; do not run them against a project file.
 
 ## 0. Size budget (sets the goal for the whole run)
 
@@ -13,15 +15,17 @@ Measure before reading anything:
 ```bash
 wc -c ~/.claude/CLAUDE.md
 awk '/^## Topical Notes Index/,0' ~/.claude/CLAUDE.md | wc -c   # how much is index
+wc -c ./CLAUDE.md 2>/dev/null                                   # project file, if the repo has one
 ```
 
-Compare against the target in `size-budget.md` (<= 40,000 chars; green band <= 32,000).
+Compare the global file against the target in `size-budget.md` (<= 40,000 chars; green band <= 32,000).
 
 - **Over target** -> the run's goal is a projected size under it. Keep working checks 1, 2 and 5 (the reduction levers) until the ledger gets there, or until nothing is left that can move without losing value - then say what is blocking the rest.
 - **In the green band** -> no reduction pass needed; just hold the net delta at `<= 0`.
 - Report the measured numbers in the scorecard's size ledger either way. Never estimate a size you can `wc -c`.
+- The project file is scored separately by check 8, under its own much looser rules.
 
-## 1. CLAUDE.md bloat (move - highest value)
+## 1. Global CLAUDE.md bloat (move - highest value)
 
 Read `~/.claude/CLAUDE.md`. For each inline entry or subsection, ask the routing question (see `routing-rubric.md`): does it apply almost every session across all projects?
 
@@ -73,6 +77,18 @@ Do not treat undated legacy content as a problem to rewrite; this check only nud
 ## 7. Backup clutter (tidy)
 
 List `~/.claude/CLAUDE.md.bak.*` snapshots. If there are several, offer to prune the older ones, keeping the most recent one or two. (These `.bak` files are the safety net for the preservation rule above - never prune below the most recent one or two.)
+
+## 8. Project CLAUDE.md weight (advisory)
+
+Only if the current repo tracks a `./CLAUDE.md`. This file loads only inside its own repo, so it gets headroom, not a leash - see `size-budget.md` > "Project CLAUDE.md" for the full rule.
+
+- **Under 20,000 chars** -> **silent**. Do not report a size, do not propose a trim, do not mention it at all. This is the normal state and is not a finding.
+- **20,000 to 40,000** -> **one advisory ledger line, zero findings**: `./CLAUDE.md: 24,180 chars (soft cap 40,000) - fine, no action`. Do not manufacture moves. A large or long-lived codebase legitimately lives here.
+- **Over 40,000** -> a real **move** finding. Propose relocation into project-local homes (`./.claude/docs/<name>.md` first, then the repo's real docs, then project memory) - **never into `~/.claude/notes/`**, which is global and would leak this repo's specifics into every other one. Leave a one-line pointer behind. Report a projected size.
+
+Even over 40,000 this stays **advisory**: the user may decline, and the audit accepts that without re-raising it in the same run. There is no no-growth rule for a project file - a run that grows `./CLAUDE.md` is not a failed run.
+
+**Strict mode** applies the global file's rules to `./CLAUDE.md` only when the user asks in this run, or a `project`-type memory file for this repo records that preference. Precedence and how to record it: `size-budget.md` > "Strict mode for a project file". When strict is on, say so in the scorecard so it is obvious which rules produced the findings.
 
 ## Reporting
 

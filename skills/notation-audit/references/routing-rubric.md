@@ -51,6 +51,12 @@ lost, not that the every-session file only ever gets bigger - relocation to `not
 hold at once. The `notation-audit` skill enforces a hard size budget on that file (net delta `<= 0`
 on every run, target <= 40,000 chars): see `size-budget.md`.
 
+That budget is the **global** file's alone. A project `./CLAUDE.md` loads only in its own repo, so
+it has room to grow - silent under 20,000 chars, advisory to 40,000, and strict only when the user
+asks. When a project file does need to shed weight, its detail goes to `./.claude/docs/`, the repo's
+own docs, or project memory - **never to `~/.claude/notes/`**, which would leak one repo's specifics
+into every other session.
+
 ## Recency timestamps
 
 New entries carry an absolute date so a future session can tell recent notation from old. Use the machine date, not a guess: `date +%Y-%m-%d`.

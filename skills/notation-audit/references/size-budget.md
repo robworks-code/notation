@@ -1,13 +1,25 @@
 # CLAUDE.md size budget
 
-`~/.claude/CLAUDE.md` loads into **every** prompt of **every** session. Its size is a recurring
-tax, so the audit treats it as a budgeted resource, not just a tidiness concern.
+Two different files are called CLAUDE.md and they get two different budgets. Throughout this skill,
+**"the global file" always means `~/.claude/CLAUDE.md`** and **"a project CLAUDE.md" always means a
+repo's own `./CLAUDE.md`**. Never apply one's rules to the other.
 
-**The audit's job is to move the global file toward the budget - never away from it.** An audit run
+| File | Loads | Budget | Enforcement |
+| --- | --- | --- | --- |
+| `~/.claude/CLAUDE.md` | every prompt of **every** session, in every repo | 40,000 chars | **Strict** - net delta `<= 0` always, reduce until under target |
+| `./CLAUDE.md` | only in the one repo it belongs to | soft, see below | **Advisory** by default; strict only on request |
+
+The asymmetry is the point. A line in the global file is paid for in every session you ever run. A
+line in a project CLAUDE.md is paid for only while you are working in that repo, and is usually
+earning its keep by orienting you in that codebase - build commands, architecture, team conventions.
+**Growth there is normal and is not a defect.** Do not port the global file's scarcity mindset onto
+a project file that is doing its job.
+
+**The audit's job is to move the global file toward its budget - never away from it.** An audit run
 that leaves `~/.claude/CLAUDE.md` larger than it found it has failed, even if every individual
 finding was correct.
 
-## The budget
+## The global budget (`~/.claude/CLAUDE.md`)
 
 Claude Code warns when a single loaded memory file exceeds **roughly 5% of the model's context
 window in characters, with a floor of ~40,000 chars** (`getMaxMemoryCharacterCount`). The floor is
@@ -26,7 +38,7 @@ wc -c ~/.claude/CLAUDE.md
 awk '/^## Topical Notes Index/,0' ~/.claude/CLAUDE.md | wc -c   # how much is index
 ```
 
-## The two rules
+## The two rules (global file only)
 
 1. **No-growth rule (always).** The net character delta of an audit's applied changes must be
    `<= 0`. This binds even when the file is already under budget.
@@ -34,36 +46,95 @@ awk '/^## Topical Notes Index/,0' ~/.claude/CLAUDE.md | wc -c   # how much is in
    propose enough relocation to land under it - or, if that is not achievable without losing value,
    say so explicitly and report the best achievable size plus what is blocking the rest.
 
+Neither rule applies to a project `./CLAUDE.md`. See the next section.
+
 **Preservation still wins over both.** These rules are satisfied by **relocating** facts into
 `~/.claude/notes/`, never by deleting still-true content. If the only way to hit the budget would be
 to destroy a fact, miss the budget and say why. See `routing-rubric.md` > "Preservation".
 
-## Additive findings must be offset
+## Project CLAUDE.md (`./CLAUDE.md`)
 
-Several audit checks *add* characters to CLAUDE.md:
+A project file only costs context inside its own repo, so it gets **headroom, not a leash**. There
+is no no-growth rule and no reduction rule by default.
+
+Three bands, measured with `wc -c ./CLAUDE.md`:
+
+- **Under 20,000 chars - silent.** Normal and healthy. Do not report a size, do not propose a
+  trim, do not mention it. Most project files live here forever.
+- **20,000 to 40,000 - one advisory line, no findings.** Report the number in the ledger and move
+  on: `./CLAUDE.md: 24,180 chars (soft cap 40,000) - fine, no action`. Do not manufacture move
+  findings. Growing into this band is expected for a large or long-lived codebase.
+- **Over 40,000 - a real finding, severity `move`.** This is the harness's own per-file warning
+  threshold, so the file now costs a warning and a meaningful slice of every session in that repo.
+  Propose relocation the same way as for the global file, but into **project-local homes**, and
+  report a projected size. It is still advisory: the user may decline and the audit accepts that
+  without re-raising it.
+
+**Where project detail goes when it does need to move** - never to `~/.claude/notes/`, which is
+global and would pollute every other repo:
+
+1. `./.claude/docs/<name>.md` - the project's own long-form guides, specs, phase write-ups. This is
+   the main destination, the project-tier equivalent of a topical note.
+2. Existing repo docs - `README.md`, `CONTRIBUTING.md`, `docs/`. A build or setup section often
+   belongs in the repo's real documentation, not in an agent-facing file.
+3. Project memory (`~/.claude/projects/<encoded-cwd>/memory/`) for a fact that is about the work
+   rather than a convention the team needs.
+
+Leave a one-line pointer in `./CLAUDE.md` for anything relocated, exactly as the global file does.
+
+### Strict mode for a project file
+
+Enforce the global file's rules (net delta `<= 0`, reduce until under target) on a project
+`./CLAUDE.md` **only** when one of these is true, in precedence order:
+
+1. **The user asks in this run** - "audit this repo strictly", "enforce the budget on the project
+   CLAUDE.md", "strict". An explicit ask always wins and applies to this run only.
+2. **A recorded project preference** - a `project`-type memory file for this repo stating that its
+   CLAUDE.md is budgeted, optionally with its own target. Check the project's `MEMORY.md` while
+   reading it in step 1. Offer to record one when the user asks for strict mode, so the next
+   session inherits it.
+3. **Otherwise: advisory.** The three bands above.
+
+When strict mode is on, say so in the scorecard (`./CLAUDE.md: strict (requested)`) so it is never
+ambiguous which rules produced the findings. A target the user names beats the 40,000 default.
+
+## Additive findings must be offset (global file)
+
+Several audit checks *add* characters to `~/.claude/CLAUDE.md`:
 
 - adding an index line for an unindexed note (check 2),
 - restoring a description on a stale index entry (check 2),
 - any newly promoted global rule.
 
 Each of these is legitimate, but each must be **counted as a positive delta in the ledger** and
-covered by relocation elsewhere in the same run. Never present an additive-only audit for a file
-that is at or over budget: pair it with at least one move that more than pays for it.
+covered by relocation elsewhere in the same run. Never present an additive-only audit for a global
+file that is at or over budget: pair it with at least one move that more than pays for it.
 
-(Recency-date findings, check 6, never touch CLAUDE.md - inline rules are not dated.)
+(Recency-date findings, check 6, never touch the global file - inline rules are not dated.)
 
 ## The size ledger
 
-Every audit report carries a ledger, and every proposed row carries its own signed CLAUDE.md delta
-in chars (`-1,840`, `+118`, `0`). Compute the deltas from the actual diff text, not by feel.
+Every audit report carries a ledger, and every proposed row carries its own signed character delta
+against the file it touches (`-1,840`, `+118`, `0`). Compute the deltas from the actual diff text,
+not by feel.
 
 ```
-CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
-Proposed:  -21,310 chars -> 38,172 projected (under target)
+~/.claude/CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
+Proposed:            -21,310 chars -> 38,172 projected (under target)
 ```
 
-If the projected number is still over target, state that plainly and name the next-best lever
-rather than quietly stopping.
+Add a second line **only when the current project has its own `./CLAUDE.md`**, and only when it is
+at 20,000 chars or more - below that it stays silent:
+
+```
+./CLAUDE.md:         24,180 chars (soft cap 40,000) - fine, no action
+```
+
+Never sum the two files into one figure. They are separate budgets with separate rules, and a
+combined number would imply a project file can be "paid for" by shrinking the global one.
+
+If a projected number is still over target, state that plainly and name the next-best lever rather
+than quietly stopping.
 
 ## Reduction tactics, best first
 
