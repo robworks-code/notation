@@ -46,6 +46,11 @@ Notation is **additive by default**. Existing lines in `~/.claude/CLAUDE.md` and
 
 When a removal genuinely is warranted (wrong/contradicted), say so explicitly in the proposal's `why` ("removes X - contradicted by Y") so the deletion is visible and justified, never incidental.
 
+**Preservation is not a licence to grow `~/.claude/CLAUDE.md`.** Additive means facts are never
+lost, not that the every-session file only ever gets bigger - relocation to `notes/` is how both
+hold at once. The `notation-audit` skill enforces a hard size budget on that file (net delta `<= 0`
+on every run, target <= 40,000 chars): see `size-budget.md`.
+
 ## Recency timestamps
 
 New entries carry an absolute date so a future session can tell recent notation from old. Use the machine date, not a guess: `date +%Y-%m-%d`.
