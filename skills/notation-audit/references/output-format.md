@@ -14,16 +14,20 @@ separator and `->` for routing.
 
 If a tier has zero items, omit it from the tally rather than printing `0`.
 
-**Audit only - the size ledger.** Directly under the audit scorecard, print the measured
-`~/.claude/CLAUDE.md` size, the net delta of the proposals, and the projected result against the
-40,000-char target (see `size-budget.md`). Measured with `wc -c`, never estimated.
+**The size ledger.** `~/.claude/CLAUDE.md` is budgeted at <= 40,000 chars (see `size-budget.md`).
+Print the ledger directly under the scorecard - **always** for an audit, and for a capture run
+**whenever any proposal touches that file** (an inline rule or a new index line). Measured with
+`wc -c`, never estimated.
 
-    CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
-    Proposed:  -21,310 chars -> 38,172 projected (under target)
+    Audit:   CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
+             Proposed:  -21,310 chars -> 38,172 projected (under target)
 
-If the projection is still over target, append ` - still over, next lever: <x>` rather than
-letting the number pass without comment. After applying, print the same ledger with the
-**re-measured** after-size.
+    Capture: CLAUDE.md: 38,140 chars -> +214 -> 38,354 projected (target 40,000)
+
+If the projection is over target, append ` - still over, next lever: <x>` (audit) or
+` - consider /notation:notate's budget gate, or run notation-audit` (capture) rather than letting
+the number pass without comment. After applying, print the ledger again with the **re-measured**
+after-size - never claim a size you have not measured.
 
 ## Zone 2 - Per-tier tables
 
@@ -39,11 +43,15 @@ The audit `delta` is that row's signed effect on `~/.claude/CLAUDE.md` in charac
 `+118`, `0`), computed from the diff text. Rows that touch only notes or memory are `0`. The column
 sums to the ledger's net figure.
 
+Capture tables add the same `delta` column **only to the GLOBAL RULES table** (and to any note row
+that adds a Topical Notes Index line), for the same reason: those are the rows that cost every
+future session. Tables with no CLAUDE.md effect omit the column entirely.
+
 Capture example:
 
     GLOBAL RULES
-      #  title               kind   conf   destination
-      1  gh merge wildcard    NEW    high   ~/.claude/CLAUDE.md
+      #  title               kind   conf   destination           delta
+      1  gh merge wildcard    NEW    high   ~/.claude/CLAUDE.md    +94
 
     TOPICAL NOTES
       #  title               kind   conf   destination
