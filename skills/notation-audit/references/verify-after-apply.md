@@ -18,15 +18,29 @@ Run the checks below in order, every time changes are applied.
 a note (consolidation, splitting) and a strict-mode move out of `./CLAUDE.md` are just as
 unrecoverable, and until this step existed they had no backup at all.
 
-```bash
+**Global-scope sources** are backed up in place, next to the file:
+
+```sh
 stamp=$(date +%Y%m%d-%H%M%S)
 cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp        # if it is a source this run
 cp ~/.claude/notes/foo.md ~/.claude/notes/foo.md.bak.$stamp  # ditto, per source note
 ```
 
-Use **one `$stamp` for the whole run** so the set restores together and there is no ambiguity about
-which snapshot to roll back to. Back up before the first write, never after - a snapshot of an
-already-edited file restores the damage.
+**Project-scope sources go outside the repo.** A strict run on `./CLAUDE.md` writes a
+backup, and writing it beside the file drops an untracked artifact into the user's working
+tree - one that most repos do not gitignore, and that on a public repo is an unwanted
+tool-generated file. Send it to a project-keyed directory under `~/.claude/` instead:
+
+```sh
+bk="$HOME/.claude/notation-backups/$(encode_cwd "$(pwd)")"
+mkdir -p "$bk"
+cp ./CLAUDE.md "$bk/CLAUDE.md.bak.$stamp"
+```
+
+`encode_cwd` is defined in `scope-resolution.md`. Use the **same `$stamp`** across both
+scopes so the whole run restores together. Never write a `.bak` into the repo working
+tree, and never delete a stray one you find there - move it (see `audit-checklist.md`
+check 7).
 
 Destinations do not need a backup (they are appended to, not rewritten), but note the byte size of
 each one now - check 2 uses it.

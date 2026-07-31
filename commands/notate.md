@@ -211,6 +211,14 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
    stamp=$(date +%Y%m%d-%H%M%S)
    cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp
    ```
+
+   A **project-scope** source (`./CLAUDE.md`, a project memory file) is backed up outside
+   the repo, so notation never leaves an artifact in the working tree:
+   ```bash
+   bk="$HOME/.claude/notation-backups/$(encode_cwd "$(pwd)")"; mkdir -p "$bk"
+   cp ./CLAUDE.md "$bk/CLAUDE.md.bak.$stamp"
+   ```
+
    A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.
 
 4. **Then apply the approved proposals.** Keep each content change atomic with its index update:
