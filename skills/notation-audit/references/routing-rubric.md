@@ -53,6 +53,13 @@ deployment detail. Full rule, the mirror case, and the never-cross list: `scope-
   above, before the tree runs - not as a nudge afterwards. If the fact stops being true
   when you switch repos, it is project-scoped, and a tool-shaped surface does not change
   that. See `scope-resolution.md`.
+- **A cheaper home never beats the right home.** `size-budget.md` tactic 3 prefers an
+  existing note because a new one costs an index line, and that preference stops at the
+  point the existing note is a stretch. The test is this rubric's own purpose: would a
+  future session looking for this fact open THAT file? If no, mint the note - the saving
+  is about 110 chars and the cost is a fact nobody finds again. Precedence:
+  `size-budget.md` > "When two rules conflict".
+  <!-- precedence-ref: routing-vs-index-cost -->
 
 ## Preservation (never destroy history)
 

@@ -64,6 +64,9 @@ PY
 step "scope-resolution tests"
 python3 tests/test_scope_resolution.py || bad "scope-resolution tests"
 
+step "rule-precedence tests"
+python3 tests/test_rule_precedence.py || bad "rule-precedence tests"
+
 step "backup-lifecycle tests"
 python3 tests/test_backup_lifecycle.py || bad "backup-lifecycle tests"
 

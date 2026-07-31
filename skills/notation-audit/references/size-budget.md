@@ -188,6 +188,10 @@ tactics at the end of this section instead.
    the *detail* out): `` `- <one-line rule>. Detail: `notes/<topic>.md`` ``.
 3. **Append into an existing note.** Prefer appending to a topic note that already exists over
    creating a new one - a new note also costs a new index line. Check `~/.claude/notes/` first.
+   **Only when that note is genuinely the right topical home**: if a future session searching
+   for this fact would not open that file, mint the new note and offset the index line
+   elsewhere in the run. See "When two rules conflict" below.
+   <!-- precedence-ref: routing-vs-index-cost -->
 4. **Cross-tier duplicate removal.** An inline copy of a fact that already lives in a note is the
    one safe deletion (check 5). Confirm the note's copy is at least as complete first; merge any
    inline-only detail INTO the note before dropping the inline copy.
@@ -202,6 +206,48 @@ tactics at the end of this section instead.
 
 Do NOT reach for: deleting still-true rules, dropping the genuinely global sections (permissions,
 gh/git, shell/PATH, session/harness, workflow, accessibility), or condensing two facts into one.
+
+## When two rules conflict
+
+Several rules in this skill pull against each other by design. Each pairing below states which
+wins, so the answer is never a session's judgment call - two sessions reaching opposite
+conclusions from the same checklist is the failure this section exists to prevent. Every rule
+that participates in one of these carries a pointer back here.
+
+**The question that settles all of them: does this index line buy findability, or only
+tidiness?** An index line is the one currency the budget protects - it costs context in every
+session, in every repo, forever. Note bytes cost nothing until a note is opened. So an index
+line is worth minting when it is what lets a future session *find* a fact, and is not worth
+minting to make an already-findable set of facts tidier.
+
+<!-- precedence-def: routing-vs-index-cost -->
+**Routing quality beats index-line cost.** Tactic 3 prefers appending to an existing note over
+minting a new one, because a new note costs an index line. That is sound budget advice and bad
+routing advice when no existing note actually fits. Apply the test: **would a future session
+looking for this fact open THIS file?** If no, the note is the wrong home no matter what it
+saves. A fact filed where nobody will look is barely better than a deleted one - and it passes
+every check this skill runs, including the preservation probe, because the string *is* on disk.
+Mint the new note and offset its index line elsewhere in the same run. ~110 chars never
+outranks whether the fact can be found again. Real case: the no-fancy-dashes *rationale*
+appended to `notes/unicode-bulk-edit.md`, a note about perl mechanics - correct on cost,
+unfindable for anyone searching why em-dashes are banned.
+
+<!-- precedence-def: split-vs-budget -->
+**The budget beats splitting an oversized note.** Check 3 flags a large note for splitting by
+sub-topic; each split adds an index line. Unlike the case above, a split buys no findability -
+those facts are already correctly filed and already reachable through the existing index line.
+It buys tidiness, paid for in the every-session currency. So while `~/.claude/CLAUDE.md` is at
+or over target, **note splits are deferred**, and the audit says it is deferring them rather
+than staying silent. Note size is not itself a problem: notes load on demand, so a 50 KB note
+costs nothing until something opens it. If a split is done anyway, its new index lines are a
+positive delta in the ledger like any other and must be offset in the same run. Real case: an
+applied run landed at 39,887 chars, 113 under target, with two notes flagged as split
+candidates - doing both would have added roughly 220 to 440 chars and undone the reduction the
+same audit had just made, with every individual finding still looking correct.
+
+The mirror case is always welcome and needs no deferral: **merging** thin sibling notes
+(tactic 6) removes N-1 index lines, buying back the exact currency the two rules above are
+arguing over.
 
 ### Project-file tactics
 
