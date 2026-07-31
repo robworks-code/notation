@@ -92,15 +92,20 @@ sums to the global ledger's net figure and feeds the pre-apply no-growth gate:
 - `project` - `./CLAUDE.md`, `./.claude/docs/`, or a project memory file. Not gated (unless strict
   mode, which gives the project file its own separate `<= 0` check).
 
-Add the `file` column to any table with a row that is not `global`, and total each group separately
-in the ledger. A table whose rows are all `global` omits the column. Labelling a `notes` row
-`global` would report a reduction of the every-session file that never happened - the exact failure
-the ledger exists to prevent. **A capture table carries it when ANY of
-its rows touches that file** - every inline global rule, and every note row that also adds a Topical
-Notes Index line. Delta is a whole-column decision, never per-row: once a table has the column,
-every row in it shows a number, and rows with no CLAUDE.md effect show `0`. A table where no row
-touches either file omits the column entirely. Across the whole report the global-file deltas sum to
-the global ledger's net figure.
+**The `file` column.** Add it to any table with a row that is not `global`, and total each group
+separately in the ledger. A table whose rows are **all** `global` omits the `file` column; a table
+holding even one `notes` or `project` row carries it, including a table whose rows are *all* `notes`
+(a check-9 note shrink) or all `project`. Labelling a `notes` row `global` would report a reduction
+of the every-session file that never happened - the exact failure the ledger exists to prevent, and
+dropping the column so the reader assumes `global` does the same thing.
+
+**The `delta` column** is a separate decision from the one above. Audit tables always carry it. **A
+capture table carries it when ANY of its rows touches a CLAUDE.md file** - every inline global rule,
+and every note row that also adds a Topical Notes Index line. Delta is a whole-column decision,
+never per-row: once a table has the column, every row in it shows a number, and rows with no
+CLAUDE.md effect show `0`. A capture table where no row touches **either CLAUDE.md** omits the
+`delta` column entirely. Across the whole report the `global` rows' deltas sum to the global
+ledger's net figure; `notes` and `project` rows total on their own lines and never feed the gate.
 
 Capture example (GLOBAL RULES always carries delta; TOPICAL NOTES carries it here because row 2
 creates a note and therefore an index line, while row 3 appends to a note that is already indexed):

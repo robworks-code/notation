@@ -37,9 +37,18 @@ CASES = [
 failures = []
 
 
-def check(name, condition, detail=""):
+def check(name, condition, detail="", info=""):
+    """Print one row. `detail` is FAILURE-only; `info` prints either way.
+
+    `detail` explains what went wrong, so it is routinely phrased as the
+    failure ("the two copies have drifted", "got X want Y"). Printing that on a
+    passing row makes a green run read as a red one - the exact misleading
+    verification output this repo exists to prevent. Anything worth showing on a
+    pass (a scanned-file count, a measured byte figure) goes in `info`.
+    """
     status = "ok  " if condition else "FAIL"
-    print(f"  [{status}] {name}" + (f" - {detail}" if detail else ""))
+    suffix = info if condition else " - ".join(x for x in (info, detail) if x)
+    print(f"  [{status}] {name}" + (f" - {suffix}" if suffix else ""))
     if not condition:
         failures.append(name)
 
@@ -92,7 +101,8 @@ if len(blocks) == 1:
 print("\nscope-resolution: no wildcard project resolution")
 # A `projects/*/memory` glob matches every project on the machine, so it can
 # never identify THE current one. This test file names the pattern in order to
-# ban it, so tests/ is excluded from its own scan. scope-resolution.md also
+# ban it, so tests/ is excluded from its own scan. Every OTHER tracked file is
+# scanned regardless of extension. scope-resolution.md also
 # must name the pattern once, in prose, to warn against it - but that
 # exemption is scoped to the ONE line that does so, not the whole file, so
 # any OTHER line in scope-resolution.md that reintroduces the glob (e.g. as
@@ -108,9 +118,16 @@ tracked = subprocess.run(
 offenders = []
 scanned = []
 for rel in tracked:
-    if rel.startswith("tests/") or not rel.endswith(".md"):
+    # Every tracked file, not just markdown - the glob is just as wrong in
+    # scripts/verify.sh, a shipped shell script, or a .py helper as it is in
+    # prose, and a .md-only scan would let it back in through any of them.
+    # Same file set as the dot-less-sed ban below.
+    if rel.startswith("tests/"):
         continue
-    body = open(os.path.join(REPO, rel), encoding="utf-8").read()
+    try:
+        body = open(os.path.join(REPO, rel), encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
     scanned.append(rel)
     for i, line in enumerate(body.splitlines(), 1):
         if re.search(r"projects/\*", line):
@@ -121,9 +138,9 @@ for rel in tracked:
 # that failed) leaves `offenders` empty and the row above passes having read
 # nothing at all. The scan must prove it reached the shipped markdown.
 check(
-    "the glob scan actually read the shipped markdown",
+    "the glob scan actually read the shipped files",
     len(scanned) >= 5 and REFERENCE_REL in scanned,
-    f"scanned {len(scanned)} tracked .md file(s)",
+    info=f"scanned {len(scanned)} tracked file(s)",
 )
 check(
     "no shipped file resolves a project with a glob",
@@ -158,7 +175,7 @@ for rel in tracked:
 check(
     "the dot-less-sed scan actually read the repo",
     len(broken_scanned) >= 5 and REFERENCE_REL in broken_scanned,
-    f"scanned {len(broken_scanned)} tracked file(s)",
+    info=f"scanned {len(broken_scanned)} tracked file(s)",
 )
 check(
     "no shipped file uses the dot-less encoding",

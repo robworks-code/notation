@@ -22,7 +22,7 @@ unrecoverable, and until this step existed they had no backup at all.
 **Global-scope sources** are backed up in place, next to the file:
 
 ```sh
-stamp=$(date +%Y%m%d-%H%M%S)
+stamp=$(date +%Y%m%d-%H%M%S); echo "$stamp"                  # record this value
 cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp        # if it is a source this run
 cp ~/.claude/notes/foo.md ~/.claude/notes/foo.md.bak.$stamp  # ditto, per source note
 ```
@@ -37,16 +37,19 @@ tool-generated file. Send both to a project-keyed directory under `~/.claude/` i
 enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 bk="$HOME/.claude/notation-backups/$enc"
 mkdir -p "$bk"
-cp ./CLAUDE.md "$bk/CLAUDE.md.bak.$stamp"
-cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.$stamp"   # per source memory file
+cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
+cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.20260730-141530"   # per source memory file
 ```
 
 The encoding rule is stated once in `scope-resolution.md`; **inline it** as above rather
 than calling a helper, because shell functions and variables do not survive from one Bash
-invocation to the next. For the same reason, record the value of `$stamp` and substitute it
-literally in any later invocation. Use the **same `$stamp`** for the whole run, across both
-scopes, so the set restores together and there is no ambiguity about which snapshot to roll
-back to. Never write a `.bak` into the repo working tree, and never delete a stray one you
+invocation to the next. `$stamp` does not survive either - that is why the block above
+carries the **literal** stamp value rather than `$stamp`, which would expand to nothing and
+write `CLAUDE.md.bak.` once per run, each run silently overwriting the previous run's only
+restore point. Record the value the first block echoed and substitute it literally in every
+later invocation, exactly as `commands/notate.md` does. Use the **same** stamp value for the
+whole run, across both scopes, so the set restores together and there is no ambiguity about
+which snapshot to roll back to. Never write a `.bak` into the repo working tree, and never delete a stray one you
 find there - move it (see `audit-checklist.md` check 7).
 
 **Back up before the first write, never after** - a snapshot of an already-edited file
