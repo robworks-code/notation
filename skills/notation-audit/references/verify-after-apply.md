@@ -19,42 +19,72 @@ Run the checks below in order, every time changes are applied.
 a note (consolidation, splitting) and a strict-mode move out of `./CLAUDE.md` are just as
 unrecoverable, and until this step existed they had no backup at all.
 
-**Global-scope sources** are backed up in place, next to the file:
+**Every backup this tool writes goes under `~/.claude/notation-backups/`, in a directory
+named for this run's stamp. Never beside the original file.** One run is one directory:
+
+```
+~/.claude/notation-backups/
+  global/<stamp>/                 <- ~/.claude/CLAUDE.md, ~/.claude/notes/*.md
+  <encoded-cwd>/<stamp>/          <- ./CLAUDE.md, project memory files
+```
+
+That layout is load-bearing three times over, and each was a real defect before it existed:
+
+1. **It keeps notation out of the user's namespace.** `~/.claude/CLAUDE.md.bak.<stamp>` is a
+   convention users already follow by hand before a large edit, and commonly manage with
+   their own rotation tooling. A tool writing the *same* pattern makes the two
+   indistinguishable: the audit cannot tell whose file it is looking at, and a rotation
+   script gzips notation's droppings while pushing the user's real snapshots out of its
+   keep-uncompressed window. Notation owns everything under `notation-backups/` and
+   nothing outside it - which is what makes classification by path honest.
+2. **It keeps backups out of the repo working tree.** A backup beside `./CLAUDE.md` is an
+   untracked artifact most repos do not gitignore, and on a public repo an unwanted
+   tool-generated file.
+3. **One run is one directory**, so a run's backups can be kept or dropped as a unit
+   instead of being reconstructed from timestamps scattered across three directories.
 
 ```sh
 stamp=$(date +%Y%m%d-%H%M%S); echo "$stamp"                  # record this value
-cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp        # if it is a source this run
-cp ~/.claude/notes/foo.md ~/.claude/notes/foo.md.bak.$stamp  # ditto, per source note
-```
-
-**Project-scope sources go outside the repo.** There are two of them: `./CLAUDE.md` under a
-strict run, and a **project memory file** that check 9 is moving a globally-true fact out of.
-Writing a backup beside `./CLAUDE.md` drops an untracked artifact into the user's working
-tree - one that most repos do not gitignore, and that on a public repo is an unwanted
-tool-generated file. Send both to a project-keyed directory under `~/.claude/` instead:
-
-```sh
 enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
-bk="$HOME/.claude/notation-backups/$enc"
-mkdir -p "$bk"
-cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
-cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.20260730-141530"   # per source memory file
+g="$HOME/.claude/notation-backups/global/20260730-141530"
+p="$HOME/.claude/notation-backups/$enc/20260730-141530"
+mkdir -p "$g" "$p"
+cp ~/.claude/CLAUDE.md "$g/CLAUDE.md"                        # if it is a source this run
+cp ~/.claude/notes/foo.md "$g/foo.md"                        # ditto, per source note
+cp ./CLAUDE.md "$p/CLAUDE.md"                                # strict-mode runs only
+cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$p/<file>.md"   # per source memory file
 ```
 
 The encoding rule is stated once in `scope-resolution.md`; **inline it** as above rather
 than calling a helper, because shell functions and variables do not survive from one Bash
 invocation to the next. `$stamp` does not survive either - that is why the block above
 carries the **literal** stamp value rather than `$stamp`, which would expand to nothing and
-write `CLAUDE.md.bak.` once per run, each run silently overwriting the previous run's only
-restore point. Record the value the first block echoed and substitute it literally in every
-later invocation, exactly as `commands/notate.md` does. Use the **same** stamp value for the
-whole run, across both scopes, so the set restores together and there is no ambiguity about
-which snapshot to roll back to. Never write a `.bak` into the repo working tree, and never delete a stray one you
-find there - move it (see `audit-checklist.md` check 7).
+write everything into a directory named `.../global/`, each run silently overwriting the
+previous run's only restore point. Record the value the first block echoed and substitute
+it literally in every later invocation, exactly as `commands/notate.md` does. Use the
+**same** stamp for the whole run, across both scopes, so the set restores together. Never
+write a `.bak` into the repo working tree, and never delete a stray one you find there -
+move it (see `audit-checklist.md` check 7).
 
 **Back up before the first write, never after** - a snapshot of an already-edited file
 restores the damage. This timing rule applies to both global-scope and project-scope
 backups.
+
+**Mark the run verified, or it can never be cleaned up.** Backups are a rollback window,
+not an archive: once checks 1-5 below have passed, this run's window has closed. Record
+that on disk - nothing else does, and an audit that wants to prune is almost always a
+different session with no memory of this one:
+
+```sh
+date > "$HOME/.claude/notation-backups/global/20260730-141530/.verified"
+date > "$HOME/.claude/notation-backups/$enc/20260730-141530/.verified"
+```
+
+Write it **only** after every check passed. A run directory without `.verified` is a run
+that failed, was interrupted, or restored - its backup is the only remaining copy of
+whatever it moved, and check 7 will never offer to delete it. Age is not a substitute for
+this marker: the oldest directory on disk is exactly as likely to be the failed run whose
+backup is load-bearing.
 
 Destinations do not need a backup (they are appended to, not rewritten), but note the byte size of
 each one now - check 2 uses it.
