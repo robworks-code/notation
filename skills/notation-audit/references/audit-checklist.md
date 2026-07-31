@@ -78,76 +78,112 @@ Do not treat undated legacy content as a problem to rewrite; this check only nud
 
 ## 7. Backup clutter (tidy)
 
-Backups are **two different artifact classes** and they get opposite treatment. Sorting
-them is the whole check; get this wrong and the audit proposes destroying history.
+Backups fall into **two classes with opposite treatment**, and the whole check is sorting
+them correctly. Get it wrong and the audit proposes destroying history.
 
-- A **config snapshot** (`~/.claude/CLAUDE.md.bak.<stamp>`) is the only record of what
-  the file said before an edit. Users accumulate these deliberately, over months, and
-  commonly manage them with their own tooling. **Never propose deleting one.**
-- A **run backup** is the rollback window for one notation run: the sources check 0 of
-  `verify-after-apply.md` copied before writing. Once that run's preservation checks
-  passed, its window has closed and the file is genuinely spent. These are the only
-  backups this check may offer to remove.
+**Ownership is what separates them, and path is a reliable proxy for ownership only
+because notation writes nowhere else.** Everything under `~/.claude/notation-backups/` is
+written by this tool (`verify-after-apply.md` check 0); everything outside it belongs to
+the user. Do not weaken that rule by writing a backup beside an original - the moment the
+two share a filename pattern, no check can tell them apart.
+
+- **The user's own backups** - anything matching `*.bak.*` outside `notation-backups/`,
+  whether a hand-made `~/.claude/CLAUDE.md.bak.<stamp>` before a large edit or a
+  `~/.claude/notes/<topic>.md.bak.<stamp>`. Frequently the only record of what a file
+  said before an edit. **Never propose deleting one**, and never assume one is
+  notation's just because the filename looks familiar.
+- **Notation run backups** - one directory per run under `notation-backups/`, holding the
+  sources that run copied before writing. Spent once that run's checks passed. These are
+  the only backups this check may offer to remove.
 
 ### List every family
 
 ```bash
-find ~/.claude -maxdepth 1 -name 'CLAUDE.md.bak.*' 2>/dev/null          # 1 config snapshots
-find ~/.claude/notes -maxdepth 1 -name '*.md.bak.*' 2>/dev/null         # 2 run backups (note sources)
+find ~/.claude -maxdepth 1 -name 'CLAUDE.md.bak.*' 2>/dev/null          # 1 user snapshots
+find ~/.claude/notes -maxdepth 1 -name '*.md.bak.*' 2>/dev/null         # 2 user note backups
 enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
-find ~/.claude/notation-backups/"$enc" -type f 2>/dev/null              # 3 run backups (this project)
-find ~/.claude/notation-backups -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l
-du -sh ~/.claude/notation-backups 2>/dev/null                           # 4 all projects, aggregate
+find ~/.claude/notation-backups/global ~/.claude/notation-backups/"$enc" \
+     -mindepth 1 -maxdepth 1 -type d 2>/dev/null                        # 3 run dirs, this run's scopes
+printf 'other projects with backups: %s\n' \
+  "$(find ~/.claude/notation-backups -mindepth 1 -maxdepth 1 -type d \
+     -not -name "$enc" -not -name global 2>/dev/null | wc -l | tr -d ' ')"   # 4 count only
+du -sh ~/.claude/notation-backups 2>/dev/null
 find . -maxdepth 1 -name 'CLAUDE.md.bak.*' 2>/dev/null                  # 5 in-repo, always a defect
 ```
 
 Use `find`, not a bare `ls` glob. The Bash tool runs zsh, where a glob matching nothing
 aborts with `no matches found` **before the command runs** - and `2>/dev/null` does not
 suppress it, because the error is the shell's, not `ls`'s. The normal state here is "no
-backups", so a glob recipe prints an error on the healthy path.
+backups", so a glob recipe prints an error on the healthy path. For the same reason every
+command in this check ends `2>/dev/null` and, where it can exit non-zero on the healthy
+path, `|| true` - a check that reports an error when nothing is wrong teaches the reader
+to ignore its own output.
 
-### Defer to an existing rotation policy - check before proposing anything
+### Which run backups are safe to remove
+
+Only a run directory containing a `.verified` marker. Check 0 writes that marker after,
+and only after, the run's preservation checks passed:
 
 ```bash
-ls ~/.claude/bin/rotate-backups.sh 2>/dev/null
-/usr/bin/grep -n -i 'rotate-backups\|prune-days' ~/.claude/CLAUDE.md
+find ~/.claude/notation-backups -mindepth 2 -maxdepth 2 -type d 2>/dev/null | while read -r d; do
+  [ -f "$d/.verified" ] && printf 'spent    %s\n' "$d" || printf 'KEEP     %s\n' "$d"
+done
+```
+
+A directory with no marker is a run that failed, was interrupted, or was restored - its
+contents are the only remaining copy of whatever that run moved. **Never offer to delete
+one, and never fall back to age as a proxy**: the oldest directory is exactly as likely
+to be the failed run whose backup is load-bearing. If unmarked directories are piling up,
+that is a finding about failed runs, not about clutter.
+
+### Defer to an existing rotation policy - for the user's own backups
+
+```bash
+ls ~/.claude/bin/rotate-backups.sh 2>/dev/null || true
+/usr/bin/grep -n -i 'rotate-backups\|prune-days' ~/.claude/CLAUDE.md 2>/dev/null || true
 ```
 
 If either turns up a policy, **the user has already reasoned about this and their policy
-wins.** Report the state as one informational ledger line - count, total size, how many
-are already compressed - and raise no finding. Do not restate their policy back to them
-as a proposal, and never contradict it: a real setup found this way keeps the 10 newest
-uncompressed for diffing, gzips the rest, and deletes nothing without an explicit age
-threshold. An audit that read its own advice literally against that setup would have
-proposed deleting 103 of 105 files.
+wins.** Report families 1 and 2 as one informational ledger line - count, total size, how
+many are already compressed - and raise no finding *for those families*. Do not restate
+their policy back to them as a proposal, and never contradict it: a real setup found this
+way keeps the 10 newest uncompressed for diffing, gzips the rest, and deletes nothing
+without an explicit age threshold. An audit that read its own advice literally against
+that setup would have proposed deleting 103 of 105 files.
+
+**The deference stops there.** It covers the families the policy is about and nothing
+else. A rotation script for `~/.claude/CLAUDE.md.bak.*` says nothing about a stray backup
+sitting in a repo working tree, and suppressing family 5 because family 1 is managed
+would silence the one finding here that is about to be committed to someone's repo.
 
 ### What may be proposed, per family
 
-1. **Config snapshots** - informational only, always. If there is no rotation policy and
-   the count is large, the safe offer is **compression** (`gzip -9` all but the newest
-   few), which is lossless and reversible. Deletion is offered only if the user asks for
-   it and only with an explicit age threshold they name - never a count this skill
-   invented, and never as a default. `keep the most recent one or two` was that invented
-   number; it is gone.
-2. **Note run backups** (`~/.claude/notes/*.md.bak.*`) - offer to delete those whose run
-   already verified. They sit inside the directory a human browses and the audit globs;
-   they do not match `*.md`, so they are never misread as notes, but they do accumulate
-   once check 9 makes note-sourced moves routine.
-3. **This project's run backups** - same rule. Deleting the newest set before this run's
-   own verification has passed removes the safety net the run depends on, so prune at
-   the **end** of a run, never at the start.
-4. **Other projects' backup dirs** - report the aggregate (directory count and total
-   size) and stop. **Never delete another project's backups**: you cannot verify from
-   here that its run passed, and by design an audit only resolves the current project
-   (`scope-resolution.md`). Hand the number to the user and let them decide.
+1. **User snapshots** (`~/.claude/CLAUDE.md.bak.*`) - informational only, always. Absent a
+   rotation policy and with a large count, the safe offer is **compression** (`gzip -9`
+   all but the newest few), which is lossless and reversible. Deletion only if the user
+   asks and only with an age threshold they name - never a count this skill invented.
+   `keep the most recent one or two` was that invented number; it is gone.
+2. **User note backups** (`~/.claude/notes/*.md.bak.*`) - same treatment as family 1.
+   Notation no longer writes here, so any file matching this pattern is the user's. They
+   do not match `*.md` and are never misread as notes.
+3. **Notation run directories** - offer to delete only those carrying `.verified`, and
+   name each one individually. Never prune the current run's directory before its own
+   verification has passed: that is the safety net the run in progress depends on.
+4. **Other projects' run directories** - report the count and the tree's total size, then
+   stop. **Never delete another project's backups**: you cannot verify from here that its
+   runs passed, and by design an audit resolves only the current project
+   (`scope-resolution.md`). The count above excludes this project and `global/`, so it is
+   not double-counting family 3.
 5. **A backup inside the repo working tree** (`./CLAUDE.md.bak.*`) is a defect, not
-   clutter: report it, offer to **move** it under `~/.claude/notation-backups/<enc>/`,
-   and note that plugin versions before 0.10.0 wrote it there. Move it - do not delete
-   it - and never delete a stray one you did not create.
+   clutter: report it, offer to **move** it under
+   `~/.claude/notation-backups/<enc>/recovered/`, and note that plugin versions before
+   0.11.0 wrote backups beside their originals. Move it - do not delete it - and never
+   delete a stray one you did not create. This family is reported even when a rotation
+   policy exists.
 
 **A `.bak` deletion is a real deletion.** It gets everything check 5's deletions get:
-named individually in the report, justified by its run having verified, applied only on
-an explicit approval, and never bundled incidentally into another finding.
+named individually in the report, justified by a `.verified` marker rather than by age,
+applied only on explicit approval, and never bundled incidentally into another finding.
 
 ## 8. Project CLAUDE.md weight (advisory)
 

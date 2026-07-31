@@ -212,20 +212,25 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 2. **If `Review by tier`:** for each tier with proposals, ask one **multi-select** question whose options are that tier's proposal titles (with the why as each option's description). If a tier has more than 4 proposals, ask it in successive batches of 4 (the tool caps options at 4). Checked options are applied; unchecked are dropped.
 
 3. **Back up every file that will lose content - before writing anything.** Snapshot `~/.claude/CLAUDE.md` if an approved change edits its rules inline, and equally any note or memory file an approved `UPDATE` will delete a line from. Use one stamp for the whole run, and **record its value** - shell variables do not survive to the next Bash call, so later invocations substitute the literal stamp:
+   Every backup goes under `~/.claude/notation-backups/`, one directory per run, **never
+   beside the original**. Writing `~/.claude/CLAUDE.md.bak.<stamp>` would collide with the
+   convention users follow by hand and manage with their own rotation tooling, leaving no
+   way to tell whose file is whose:
    ```bash
    stamp=$(date +%Y%m%d-%H%M%S); echo "$stamp"
-   cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp
+   mkdir -p "$HOME/.claude/notation-backups/global/$stamp"
+   cp ~/.claude/CLAUDE.md "$HOME/.claude/notation-backups/global/$stamp/CLAUDE.md"
    ```
 
-   A **project-scope** source (`./CLAUDE.md`, a project memory file) is backed up outside
-   the repo, so notation never leaves an artifact in the working tree. Re-derive the
-   encoding line here and substitute the recorded stamp value literally - neither the
-   function nor `$stamp` survives from the previous invocation:
+   A **project-scope** source (`./CLAUDE.md`, a project memory file) goes under the same
+   tree, keyed by project, so notation never leaves an artifact in the working tree.
+   Re-derive the encoding line here and substitute the recorded stamp value literally -
+   neither the encoding nor `$stamp` survives from the previous invocation:
    ```bash
    enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
-   bk="$HOME/.claude/notation-backups/$enc"; mkdir -p "$bk"
-   cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
-   cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.20260730-141530"
+   bk="$HOME/.claude/notation-backups/$enc/20260730-141530"; mkdir -p "$bk"
+   cp ./CLAUDE.md "$bk/CLAUDE.md"
+   cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md"
    ```
 
    A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.
@@ -236,7 +241,7 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 
    If a proposal removes content, **pick its probe string now, before the removal**, and confirm two things while you still can: the string is present in the text being removed, and absent from the destination. A probe chosen after the fact cannot establish either, and the second condition is the one that stops a stale copy in the destination from producing a false pass.
 
-5. **Verify anything that removed content.** Most capture is purely additive and needs no check. But if an approved proposal **deleted or relocated** an existing line (an `UPDATE` carrying `-` lines, or a rewrite that moved detail into a note), prove the content survived before reporting success: confirm the probe string from item 4 now appears in the destination with `/usr/bin/grep -c -F '<string>' <destination>`, and that it is gone from the source. If either check fails, restore that file from its item-3 snapshot and say so. Shrinking a file is the failure signature of a lost fact, so never let a size number stand in for this. A rewrite that legitimately *reworded* content is a compression, not a relocation - do not probe it; hold it to the standard that every distinct fact survives in the shorter text. Full procedure: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/verify-after-apply.md`.
+5. **Verify anything that removed content.** Most capture is purely additive and needs no check. But if an approved proposal **deleted or relocated** an existing line (an `UPDATE` carrying `-` lines, or a rewrite that moved detail into a note), prove the content survived before reporting success: confirm the probe string from item 4 now appears in the destination with `/usr/bin/grep -c -F '<string>' <destination>`, and that it is gone from the source. If either check fails, restore that file from its item-3 snapshot and say so. Once every check has passed, write the `.verified` marker into this run's backup directories (`date > "$HOME/.claude/notation-backups/global/20260730-141530/.verified"`) - without it, no later audit can tell a spent backup from the sole surviving copy of a failed run, and check 7 will never offer to clean it up. Shrinking a file is the failure signature of a lost fact, so never let a size number stand in for this. A rewrite that legitimately *reworded* content is a compression, not a relocation - do not probe it; hold it to the standard that every distinct fact survives in the shorter text. Full procedure: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/verify-after-apply.md`.
 
 6. **Summary.** Report what was applied and what was skipped, grouped by tier, referencing files by absolute path.
 
