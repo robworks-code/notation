@@ -50,11 +50,13 @@ Compare the "Topical Notes Index" section in CLAUDE.md against the actual files 
 
 **Note consolidation (move).** Several thin sibling notes on one subject can merge into a single topic note, dropping N-1 index lines along with the duplication. Merge content, never discard it.
 
-## 3. Note size and focus (move / tidy)
+## 3. Note size and focus (tidy / move)
 
 For each `~/.claude/notes/*.md`:
-- If it has grown to cover several unrelated sub-topics, suggest splitting (e.g. `external-apis.md` -> per-service files) and updating the index accordingly.
-- If two notes overlap heavily, suggest merging.
+- If it has grown to cover several unrelated sub-topics, suggest splitting (e.g. `external-apis.md` -> per-service files) and updating the index accordingly. This is a **tidy**, not a move: no fact becomes findable that was not already, and each split file costs a new index line.
+  **Defer splits while `~/.claude/CLAUDE.md` is at or over target**, and say you are deferring them rather than staying silent. Note size costs nothing on its own - notes load on demand - while index lines cost context in every session. If a split is done anyway, its added index lines are a positive delta in the ledger like any other and must be offset in the same run. <!-- precedence-ref: split-vs-budget -->
+- If two notes overlap heavily, suggest **merging** (severity `move`). This is the opposite trade and is always welcome: it removes N-1 index lines, buying back the currency the rule above is protecting.
+- If a note's content has drifted from what its index hook advertises, flag it `tidy` - that mismatch is what mis-routed appends leave behind, and it is the symptom that the fact is now filed where nobody will look for it. Refresh the hook, or move the misfiled section to a note whose subject it actually matches. <!-- precedence-ref: routing-vs-index-cost -->
 
 ## 4. Project memory pointers (fix)
 
