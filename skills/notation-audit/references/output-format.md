@@ -10,7 +10,14 @@ One or two lines. State the session read (or audit scope) and the tally, using `
 separator and `->` for routing.
 
 - Capture: `Read: <session-type> session (<N> turns) - <M> learnings -> <a> global - <b> notes - <c> memory`
-- Audit:   `Audited: CLAUDE.md + <N> notes + <M> memories - <x> move - <y> fix - <z> tidy`
+- Audit:   `Audited: global (CLAUDE.md + <N> notes) + project <abs-path> (<M> memories) - <x> move - <y> fix - <z> tidy`
+
+**The audit always names the project it resolved**, by absolute path, even when it found
+no project memory (`project <abs-path> (no memory dir)`). A run in the wrong cwd is
+otherwise invisible in the output, and the two scopes are scored separately - the reader
+has to be able to see which project's files the project rows are about. When the session
+has additional working directories, this is the primary cwd; say so if it is not the
+directory the user was working in. See `scope-resolution.md`.
 
 If a tier has zero items, omit it from the tally rather than printing `0`.
 
@@ -71,16 +78,34 @@ Audit columns: `#`, `title`, `severity`, `problem`, `delta`.
 "Every row's delta needs a method". Mark a row whose replacement length was assumed rather than
 drafted with a trailing `~` (`-3,610~`), so an estimated figure is never read as a measured one.
 
-**Deltas never pool across the two CLAUDE.md files.** A global-file row's delta and a project-file
-row's delta are different currencies: only the global ones sum to the global ledger's net figure and
-feed the pre-apply gate. When a report contains any project-file row, add a `file` column to that
-table (values `global` / `project`) and total the two groups separately in the ledger. A report with
-only global rows omits the column. **A capture table carries it when ANY of
-its rows touches that file** - every inline global rule, and every note row that also adds a Topical
-Notes Index line. Delta is a whole-column decision, never per-row: once a table has the column,
-every row in it shows a number, and rows with no CLAUDE.md effect show `0`. A table where no row
-touches either file omits the column entirely. Across the whole report the global-file deltas sum to
-the global ledger's net figure.
+**Deltas never pool across files of different scope.** A row's delta is a different currency
+depending on which file it lands on, so the `file` column has **three** values - only the first
+sums to the global ledger's net figure and feeds the pre-apply no-growth gate:
+
+- `global` - the row touches `~/.claude/CLAUDE.md` itself (an inline rule, a Topical Notes Index
+  line). **Gated.**
+- `notes` - a global-scope file that is not the gated one: `~/.claude/notes/<topic>.md`. Loads in
+  every session, but its bytes are not the every-session file's bytes, so this delta **never**
+  feeds the gate. A check 9 note shrink is this value. If the row *also* removes the note's index
+  line, it touches `~/.claude/CLAUDE.md` too - split it into a `notes` row and a `global` row, or
+  label it `global` and count only the index-line bytes there.
+- `project` - `./CLAUDE.md`, `./.claude/docs/`, or a project memory file. Not gated (unless strict
+  mode, which gives the project file its own separate `<= 0` check).
+
+**The `file` column.** Add it to any table with a row that is not `global`, and total each group
+separately in the ledger. A table whose rows are **all** `global` omits the `file` column; a table
+holding even one `notes` or `project` row carries it, including a table whose rows are *all* `notes`
+(a check-9 note shrink) or all `project`. Labelling a `notes` row `global` would report a reduction
+of the every-session file that never happened - the exact failure the ledger exists to prevent, and
+dropping the column so the reader assumes `global` does the same thing.
+
+**The `delta` column** is a separate decision from the one above. Audit tables always carry it. **A
+capture table carries it when ANY of its rows touches a CLAUDE.md file** - every inline global rule,
+and every note row that also adds a Topical Notes Index line. Delta is a whole-column decision,
+never per-row: once a table has the column, every row in it shows a number, and rows with no
+CLAUDE.md effect show `0`. A capture table where no row touches **either CLAUDE.md** omits the
+`delta` column entirely. Across the whole report the `global` rows' deltas sum to the global
+ledger's net figure; `notes` and `project` rows total on their own lines and never feed the gate.
 
 Capture example (GLOBAL RULES always carries delta; TOPICAL NOTES carries it here because row 2
 creates a note and therefore an index line, while row 3 appends to a note that is already indexed):

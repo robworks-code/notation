@@ -31,9 +31,16 @@ POINTER = "- gcloud CLI reference: `notes/gcloud.md`\n"
 failures = []
 
 
-def check(name, condition, detail=""):
+def check(name, condition, detail="", info=""):
+    """Print one row. `detail` is FAILURE-only; `info` prints either way.
+
+    `detail` explains what went wrong, so it is routinely phrased as the
+    failure. Printing that on a passing row makes a green run read as a red one.
+    Anything worth showing on a pass (a measured byte figure) goes in `info`.
+    """
     status = "ok  " if condition else "FAIL"
-    print(f"  [{status}] {name}" + (f" - {detail}" if detail else ""))
+    suffix = info if condition else " - ".join(x for x in (info, detail) if x)
+    print(f"  [{status}] {name}" + (f" - {suffix}" if suffix else ""))
     if not condition:
         failures.append(name)
 
@@ -84,7 +91,7 @@ def case_broken_append_shrinks_identically(tmp):
     check(
         "broken run shrinks by exactly as much as the healthy run",
         (h_before - h_after) == (b_before - b_after) > 0,
-        f"{h_before - h_after} bytes both",
+        info=f"{h_before - h_after} bytes both",
     )
     check("a size-only check calls the BROKEN run a success", b_after < b_before)
     check("probe passes on the healthy run", hits(PROBE, h_dst) >= 1)
@@ -121,7 +128,7 @@ def case_truncated_write(tmp):
     check(
         "byte conservation catches it independently of probe placement",
         grew < removed,
-        f"destination grew {grew}, needed >= {removed}",
+        info=f"destination grew {grew}, needed >= {removed}",
     )
 
 

@@ -6,7 +6,7 @@ Walk these checks in order. For each finding, record the file path, the problem,
 
 **Net size of the GLOBAL file must not grow (applies to every fix below).** Preservation is not a licence to grow the every-session file. Each finding carries a signed character delta against `~/.claude/CLAUDE.md`, and the run's total must be `<= 0`; when the file is over target the total must be negative enough to land under it. Additive findings (check 2, and any promoted global rule) must be offset by moves in the same run. Full budget and tactics: `size-budget.md`.
 
-**This rule is about `~/.claude/CLAUDE.md` only.** A project's own `./CLAUDE.md` has a soft, advisory budget with real headroom - see check 8. Checks 1, 2 and 5 below all operate on the global file; do not run them against a project file. (Under strict mode, check 8 scores the project file against the global file's *rules* - it still never runs checks 1, 2 or 5, because those relocate into the global `~/.claude/notes/`.)
+**This rule is about `~/.claude/CLAUDE.md` only.** A project's own `./CLAUDE.md` has a soft, advisory budget with real headroom - see check 8. Checks 1, 2 and 5 below all operate on the global file; do not run them against a project file - **except check 5's cross-scope half** ("Compare across scopes too"), which deliberately compares project memory against the global notes to find the same fact filed in both scopes. That half reads project files by design; it is exempt because it **relocates nothing into the global tier** - both copies already exist, and it only deletes the redundant one. Which copy that is depends on the fact's own scope, not on a fixed direction: a repo-bound fact loses its *global* copy, a globally-true fact loses its *project* copy (check 5, "Keep the copy whose scope matches the fact"). Deleting the global copy of an everywhere-true fact would strand it in one repo - the leak check 9's second bullet exists to fix. (Under strict mode, check 8 scores the project file against the global file's *rules* - it still never runs checks 1, 2 or the global-tier half of 5, because those relocate into the global `~/.claude/notes/`.)
 
 ## 0. Size budget (sets the goal for the whole run)
 
@@ -67,6 +67,8 @@ For the current project's memory dir (`~/.claude/projects/<encoded-cwd>/memory/`
 
 Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CLAUDE.md and in a note). Recommend keeping the more specific home (usually the note) and removing the **redundant copy** - this is the one safe deletion, because the fact survives in the other tier. Before flagging, confirm the two entries are genuinely the same fact and that the surviving copy is at least as complete; if the CLAUDE.md copy has detail the note lacks, merge that detail INTO the note first, then drop the inline copy. Never delete both, and never delete the only copy of a fact.
 
+**Compare across scopes too, not just across global tiers.** A fact can sit in project memory *and* in a global note. Keep the copy whose scope matches the fact - if it stops being true in another repo, project memory is the survivor and the global note's copy is the redundant one, not the reverse. Removing the global copy is the safe deletion here because the fact survives in project memory; removing the project copy would leave a repo-bound fact loaded in every session.
+
 ## 6. Missing recency dates (tidy)
 
 New-style notation carries an absolute date (see `routing-rubric.md` > "Recency timestamps"). Flag, as low-priority tidy:
@@ -76,7 +78,15 @@ Do not treat undated legacy content as a problem to rewrite; this check only nud
 
 ## 7. Backup clutter (tidy)
 
-List `~/.claude/CLAUDE.md.bak.*` snapshots. If there are several, offer to prune the older ones, keeping the most recent one or two. (These `.bak` files are the safety net for the preservation rule above - never prune below the most recent one or two.)
+List backups from **both** scopes:
+
+```bash
+ls ~/.claude/CLAUDE.md.bak.* 2>/dev/null
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+ls ~/.claude/notation-backups/"$enc"/ 2>/dev/null
+```
+
+If there are several in either place, offer to prune the older ones, keeping the most recent one or two per scope. (These are the safety net for the preservation rule - never prune below the most recent one or two.) A backup found **inside the repo working tree** (`./CLAUDE.md.bak.*`) is a defect, not clutter: report it, offer to move it under `~/.claude/notation-backups/`, and note that older plugin versions created it there.
 
 ## 8. Project CLAUDE.md weight (advisory)
 
@@ -93,6 +103,20 @@ Even over 40,000 this stays **advisory**: the user may decline, and the audit ac
 **Strict mode** applies the global file's rules (net delta `<= 0`, reduce until under target) to `./CLAUDE.md`, but only when the user asks in this run, or a `project`-type memory file for this repo records that preference. Precedence and how to record it: `size-budget.md` > "Strict mode for a project file".
 
 When strict is on it **replaces all three bands**, including the silent one: always print the project ledger line and always score the file, even under 20,000 chars. Say in the scorecard which trigger fired - `strict (requested)` or `strict (project memory)` - so it is obvious which rules produced the findings. Relocation destinations do not change: still project-local, never `~/.claude/notes/`.
+
+## 9. Scope leakage (move)
+
+Content in the scope that does not match the fact. Both directions are real, and neither is caught by any check above. Full definitions and the never-cross list: `scope-resolution.md`.
+
+When the fact appears in only one location (the wrong scope) - if it already exists in both scopes, check 5 handles the mismatch instead:
+
+- **A global note whose subject is one repo.** `~/.claude/notes/<topic>.md` is about a tool, platform, API, SDK, or service. Signals: the note names a repo, a repo-local path, a service name that exists only in one project, or a deployment detail true of exactly one deploy. Flag to **move** into that project's memory (or `./.claude/docs/` if it is long-form), leaving the genuinely tool-general parts behind. Only propose this when the project is identifiable - if the note does not say which repo it belongs to, flag it `tidy` and ask, rather than guessing a destination.
+- **Project memory holding a global fact.** A memory file that would stay true in any repo belongs in `~/.claude/notes/` or, if it fires every session, inline. Flag to move and drop the `MEMORY.md` pointer with it. This is the named exception to never-cross rule 2 (`scope-resolution.md`): the rule forbids relocating project-**scoped** content globally, and this fact was never project-scoped - it was only filed that way. The memory file is a **project-scope source** and must be backed up to `~/.claude/notation-backups/<encoded-cwd>/` before the removal, like any other source (`verify-after-apply.md` check 0).
+- **A project fact duplicated into a global note.** Handled as check 5's cross-scope case; count it there, not twice.
+
+**A whole note is rarely uniformly misfiled.** The usual shape is a tool note with two or three repo-bound entries in it. Propose moving those entries, not the file - and relocate them verbatim, under the same preservation rule as every other move.
+
+Deltas from this check are per-file and never pooled with the other scope's - a global note shrinking does not pay for project memory growing, and neither feeds the global CLAUDE.md no-growth gate unless the row actually touches `~/.claude/CLAUDE.md` (it does when a note is emptied entirely and its index line goes with it). Carry a note-file row in the report's `file` column as `notes`, never `global` - `global` is reserved for rows against `~/.claude/CLAUDE.md` and is what the gate sums (`output-format.md` > Zone 2).
 
 ## Reporting
 

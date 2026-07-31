@@ -52,8 +52,22 @@ Before proposing anything, ground yourself in two sources so proposals are real,
 
 **Session (what actually happened):** combine your in-context recall with a light scan of this session's transcript, which catches learnings that scrolled out of context.
 ```bash
-# encoded-cwd = absolute cwd with every "/" replaced by "-" (leading slash included)
-enc=$(pwd | sed 's#/#-#g')
+# encoded-cwd = absolute cwd with every "/" AND every "." replaced by "-".
+# Omitting the "." case is the classic bug: it resolves any dotted path to a
+# directory that does not exist. Full rule: scope-resolution.md.
+```
+
+<!-- canonical-encoding -->
+```sh
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+```
+
+**Inline that line at every point of use.** The Bash tool does not persist shell functions or
+variables between calls, so a helper defined here would be unset everywhere else and `$enc`
+would expand to empty. Repeat it as the first line of each invocation that needs it:
+
+```bash
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 tx=$(ls -t ~/.claude/projects/"$enc"/*.jsonl 2>/dev/null | head -1)
 echo "transcript: $tx"
 ```
@@ -101,6 +115,12 @@ Turn each survivor into a **proposal** with these fields - you will reuse them v
 
 Assign every proposal's **tier**:
 
+**Decide scope before tier.** Ask "does this stop being true in another repo?" first. A
+yes routes to the project rows below and never to the global ones, even when the learning
+is tool-shaped - that combination is exactly how one repo's detail ends up in
+`~/.claude/notes/`. Full rule:
+`${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/scope-resolution.md`.
+
 | Signal | Tier | Destination |
 | --- | --- | --- |
 | High-frequency, cross-project, fires almost every session (permission/CLI/session quirks) | **Global rules** | `~/.claude/CLAUDE.md` (inline) |
@@ -141,11 +161,18 @@ If the learning is already covered, drop the proposal - do not restate it. If it
 - **When a note is the destination because you relocated bulk from CLAUDE.md, move every fact verbatim** - relocation must not lose detail.
 
 **Project memory:**
-- Find the per-project memory dir. It is the harness path `~/.claude/projects/<encoded-cwd>/memory/`, where `<encoded-cwd>` is the absolute cwd with every `/` replaced by `-` (leading slash included). Confirm with:
+- Find the per-project memory dir by **exact path**, re-deriving Step 1's encoding line in
+  this same invocation - never a `*` glob, which matches every project on the machine and
+  cannot identify this one:
   ```bash
-  ls -d ~/.claude/projects/*/memory 2>/dev/null
+  enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+  mem="$HOME/.claude/projects/$enc/memory"
+  ls -d "$mem" 2>/dev/null
   ```
-  and match the entry whose name encodes the current project path. If none exists for this project, ask the user before creating one.
+  If it does not exist, this project has no memory yet - ask the user before creating one.
+  If the session has additional working directories, resolve against the primary cwd and
+  say which project you resolved. Full rule:
+  `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/scope-resolution.md`.
 - One fact per file. Frontmatter:
   ```markdown
   ---
@@ -184,11 +211,23 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 
 2. **If `Review by tier`:** for each tier with proposals, ask one **multi-select** question whose options are that tier's proposal titles (with the why as each option's description). If a tier has more than 4 proposals, ask it in successive batches of 4 (the tool caps options at 4). Checked options are applied; unchecked are dropped.
 
-3. **Back up every file that will lose content - before writing anything.** Snapshot `~/.claude/CLAUDE.md` if an approved change edits its rules inline, and equally any note or memory file an approved `UPDATE` will delete a line from. Use one stamp for the whole run:
+3. **Back up every file that will lose content - before writing anything.** Snapshot `~/.claude/CLAUDE.md` if an approved change edits its rules inline, and equally any note or memory file an approved `UPDATE` will delete a line from. Use one stamp for the whole run, and **record its value** - shell variables do not survive to the next Bash call, so later invocations substitute the literal stamp:
    ```bash
-   stamp=$(date +%Y%m%d-%H%M%S)
+   stamp=$(date +%Y%m%d-%H%M%S); echo "$stamp"
    cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp
    ```
+
+   A **project-scope** source (`./CLAUDE.md`, a project memory file) is backed up outside
+   the repo, so notation never leaves an artifact in the working tree. Re-derive the
+   encoding line here and substitute the recorded stamp value literally - neither the
+   function nor `$stamp` survives from the previous invocation:
+   ```bash
+   enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+   bk="$HOME/.claude/notation-backups/$enc"; mkdir -p "$bk"
+   cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
+   cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.20260730-141530"
+   ```
+
    A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.
 
 4. **Then apply the approved proposals.** Keep each content change atomic with its index update:

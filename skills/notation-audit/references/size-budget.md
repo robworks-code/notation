@@ -125,18 +125,36 @@ Every audit report carries a ledger, and every proposed row carries its own sign
 against the file it touches (`-1,840`, `+118`, `0`). Compute the deltas from the actual diff text,
 not by feel.
 
-**Deltas are per-file and never pooled.** A row's delta belongs to exactly one file, and the two
-files' deltas total separately. Only global-file deltas feed the global ledger, the no-growth rule,
-and the pre-apply gate; a project-file row's delta feeds the project line alone. When a report
-contains rows of both kinds, say which file each delta is against (see `output-format.md` > Zone 2)
-so a project move can never be read as a global reduction.
+**Deltas are per-file and never pooled.** A row's delta belongs to exactly one file, and the three
+buckets total separately: `global` (`~/.claude/CLAUDE.md`), `notes` (`~/.claude/notes/<topic>.md`),
+and `project` (`./CLAUDE.md`, `./.claude/docs/`, a project memory file). Only global-file deltas
+feed the global ledger, the no-growth rule, and the pre-apply gate; a `notes` row and a `project`
+row each feed their own ledger line alone. When a report contains rows of more than one kind, say
+which file each delta is against (see `output-format.md` > Zone 2) so a note or project move can
+never be read as a global reduction.
 
 ```
 ~/.claude/CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
 Proposed:            -21,310 chars -> 38,172 projected (under target)
 ```
 
-Add a second line **only when the current project has its own `./CLAUDE.md`**, and only when it is
+Add a **notes line** whenever any row's `file` is `notes` - a check 9 note shrink, a consolidation,
+a split. It is global-scope but never gated, so it gets its own line and never merges into the
+figures above:
+
+```
+~/.claude/notes/:    -3,140 chars across 2 notes (global scope, not gated)
+```
+
+Do the same for `project` rows that touch no `./CLAUDE.md` - a project memory file a check 9 move
+grows, for instance. That delta belongs on its own line too, so it is never dropped from the report
+for want of somewhere to put it:
+
+```
+project memory:      +2,980 chars (project scope, not gated)
+```
+
+Add a project line **only when the current project has its own `./CLAUDE.md`**, and only when it is
 at 20,000 chars or more - below that it stays silent, unless strict mode is on (a strict run always
 prints the line, at any size):
 
@@ -144,8 +162,10 @@ prints the line, at any size):
 ./CLAUDE.md:         24,180 chars (soft cap 40,000) - fine, no action
 ```
 
-Never sum the two files into one figure. They are separate budgets with separate rules, and a
-combined number would imply a project file can be "paid for" by shrinking the global one.
+Never sum these lines into one figure. `global`, `notes` and `project` are separate budgets with
+separate rules - only the first is gated - and a combined number would imply a project file, or a
+note, can be "paid for" by shrinking the global one, or that a note shrink counts as an
+every-session-file reduction.
 
 If a projected number is still over target, state that plainly and name the next-best lever rather
 than quietly stopping.

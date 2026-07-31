@@ -7,7 +7,8 @@ check passes with flying colors. **Shrinking is the failure signature of data lo
 alone can never be the proof.
 
 Throughout this file, **source** is whichever file content is leaving (`~/.claude/CLAUDE.md`, a
-project `./CLAUDE.md` under strict mode, or a note being consolidated away) and **destination** is
+project `./CLAUDE.md` under strict mode, a note being consolidated away, or a **project memory
+file** a scope-leakage move is emptying - see `audit-checklist.md` check 9) and **destination** is
 wherever it lands. The procedure is the same for all of them; only the paths change.
 
 Run the checks below in order, every time changes are applied.
@@ -18,15 +19,42 @@ Run the checks below in order, every time changes are applied.
 a note (consolidation, splitting) and a strict-mode move out of `./CLAUDE.md` are just as
 unrecoverable, and until this step existed they had no backup at all.
 
-```bash
-stamp=$(date +%Y%m%d-%H%M%S)
+**Global-scope sources** are backed up in place, next to the file:
+
+```sh
+stamp=$(date +%Y%m%d-%H%M%S); echo "$stamp"                  # record this value
 cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp        # if it is a source this run
 cp ~/.claude/notes/foo.md ~/.claude/notes/foo.md.bak.$stamp  # ditto, per source note
 ```
 
-Use **one `$stamp` for the whole run** so the set restores together and there is no ambiguity about
-which snapshot to roll back to. Back up before the first write, never after - a snapshot of an
-already-edited file restores the damage.
+**Project-scope sources go outside the repo.** There are two of them: `./CLAUDE.md` under a
+strict run, and a **project memory file** that check 9 is moving a globally-true fact out of.
+Writing a backup beside `./CLAUDE.md` drops an untracked artifact into the user's working
+tree - one that most repos do not gitignore, and that on a public repo is an unwanted
+tool-generated file. Send both to a project-keyed directory under `~/.claude/` instead:
+
+```sh
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+bk="$HOME/.claude/notation-backups/$enc"
+mkdir -p "$bk"
+cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
+cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.20260730-141530"   # per source memory file
+```
+
+The encoding rule is stated once in `scope-resolution.md`; **inline it** as above rather
+than calling a helper, because shell functions and variables do not survive from one Bash
+invocation to the next. `$stamp` does not survive either - that is why the block above
+carries the **literal** stamp value rather than `$stamp`, which would expand to nothing and
+write `CLAUDE.md.bak.` once per run, each run silently overwriting the previous run's only
+restore point. Record the value the first block echoed and substitute it literally in every
+later invocation, exactly as `commands/notate.md` does. Use the **same** stamp value for the
+whole run, across both scopes, so the set restores together and there is no ambiguity about
+which snapshot to roll back to. Never write a `.bak` into the repo working tree, and never delete a stray one you
+find there - move it (see `audit-checklist.md` check 7).
+
+**Back up before the first write, never after** - a snapshot of an already-edited file
+restores the damage. This timing rule applies to both global-scope and project-scope
+backups.
 
 Destinations do not need a backup (they are appended to, not rewritten), but note the byte size of
 each one now - check 2 uses it.

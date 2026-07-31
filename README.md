@@ -10,7 +10,7 @@ Most "update CLAUDE.md" commands dump everything into one file. `notation` does 
 | --- | --- | --- |
 | Global rules | `~/.claude/CLAUDE.md` | High-frequency, cross-project rules that fire almost every session |
 | Topical notes | `~/.claude/notes/*.md` | Tool / platform / API-specific gotchas, loaded on demand, indexed in CLAUDE.md |
-| Project memory | `~/.claude/projects/<project>/memory/` | Per-project facts, one per frontmatter file, indexed by `MEMORY.md` |
+| Project memory | `~/.claude/projects/<encoded-cwd>/memory/` | Per-project facts, one per frontmatter file, indexed by `MEMORY.md` |
 | Project docs | `./.claude/docs/`, `./CLAUDE.md` | Team-shared guides and conventions tracked in the repo |
 
 ## What you get
