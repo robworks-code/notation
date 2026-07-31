@@ -198,6 +198,112 @@ if len(blocks) == 1 and len(copies) == 1:
         "the two copies have drifted",
     )
 
+print("\nscope-resolution: every encoding call site matches the canonical one")
+# The encoding cannot be a helper (shell state does not persist between Bash
+# calls), so it is inlined at every point of use - currently nine of them. The
+# marker-based check above only covers the two marked copies; the ban below only
+# covers one historically broken literal. Neither catches a call site drifting
+# into a DIFFERENTLY wrong form (`sed 's|/|-|g'`, `tr '/.' '--'`,
+# `${PWD//\//-}`, or a dropped trailing `g`), which fails exactly like the
+# original bug. So: find every site by a deliberately LOOSE signal, then require
+# each to be byte-identical to the canonical expression.
+#
+# The signal must stay loose. A detector that only recognises the correct form
+# would skip a drifted site instead of failing on it - a guard that passes by
+# not looking. Anything mentioning the cwd, or assigning `enc`, is a candidate,
+# and a candidate the extractor cannot parse is an offender rather than a skip.
+#
+# `\$\{?PWD` must cover the BRACED form too. Matching only `$PWD` would skip
+# `dir=${PWD//\//-}` - a drift this scan specifically exists to catch - because
+# it assigns no `enc` either, so nothing else would look at the line. The
+# coverage row below would notice the site count dropped, but only until the
+# repo legitimately gains a tenth call site, at which point the same drift ships
+# green.
+CANDIDATE = re.compile(r"\benc=|\$\{?PWD\b|\$\(\s*pwd|`pwd`|\bpwd\b", re.IGNORECASE)
+# RHS of an `enc=` assignment: a command substitution, a parameter expansion, or
+# a bare word. The `$(...)` form tolerates no nested `)`, which the canonical
+# expression does not have - a site that grew one is unparseable here and is
+# therefore reported, not skipped.
+ASSIGN = re.compile(r"\benc=(\$\([^)]*\)|\$\{[^}]*\}|[^\s;`]+)")
+canon_rhs = blocks[0].strip().split("=", 1)[1] if len(blocks) == 1 else None
+
+# Prose that must NAME a wrong form in order to warn against it, or that
+# mentions the cwd conversationally. Like the two scans above, an exemption is
+# scoped to ONE exact line, never to a whole file - so any other line in the
+# same file that reintroduces a bad form is still caught. Add a line here only
+# when it is documentation ABOUT the encoding, never to quiet a real call site.
+ENCODE_EXEMPT = {
+    (
+        "skills/notation-audit/references/scope-resolution.md",
+        "form - another `sed` delimiter, `tr`, `${PWD//\\//-}`, a dropped trailing `g` - fails",
+    ),
+}
+
+# Every file expected to carry at least one call site. Listed so that deleting a
+# site (or a scan that silently reads nothing) fails instead of passing with an
+# empty offender list.
+EXPECTED_SITE_FILES = {
+    "commands/notate.md",
+    "skills/notation-audit/SKILL.md",
+    "skills/notation-audit/references/scope-resolution.md",
+    "skills/notation-audit/references/audit-checklist.md",
+    "skills/notation-audit/references/verify-after-apply.md",
+}
+sites = []
+drifted = []
+exempted = []
+for rel in tracked:
+    if rel.startswith("tests/"):
+        continue
+    try:
+        body = open(os.path.join(REPO, rel), encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    for i, line in enumerate(body.splitlines(), 1):
+        if not CANDIDATE.search(line):
+            continue
+        if (rel, line.strip()) in ENCODE_EXEMPT:
+            exempted.append((rel, line.strip()))
+            continue
+        found = ASSIGN.findall(line)
+        if not found:
+            # Mentions the cwd but assigns no `enc` - an encoding written under
+            # another name, or prose that should not be naming $PWD at all.
+            drifted.append(f"{rel}:{i}: unrecognized form: {line.strip()}")
+            continue
+        for rhs in found:
+            sites.append((rel, i))
+            if rhs != canon_rhs:
+                drifted.append(f"{rel}:{i}: {rhs}")
+
+site_files = {rel for rel, _ in sites}
+check(
+    "the call-site scan found every file expected to carry one",
+    len(sites) >= 9 and EXPECTED_SITE_FILES <= site_files,
+    f"found {len(sites)} site(s) in {sorted(site_files)}; "
+    f"missing {sorted(EXPECTED_SITE_FILES - site_files)}",
+    info=f"{len(sites)} call site(s) across {len(site_files)} file(s)",
+)
+# An exemption that no longer matches any line is a dead entry that would let a
+# future line matching the OLD text through unnoticed - and, worse, reads as
+# coverage. Require each to still be earning its keep.
+check(
+    "every exemption still matches a real line",
+    len(exempted) == len(ENCODE_EXEMPT),
+    f"{len(ENCODE_EXEMPT) - len(set(exempted))} stale exemption(s): "
+    f"{sorted(ENCODE_EXEMPT - set(exempted))}",
+    info=f"{len(exempted)} exempted prose line(s)",
+)
+# Guarded: with no single canonical block, `canon_rhs` is None and all 9 real
+# sites compare unequal, burying the actual cause (the already-failing row at
+# the top) under a 9-entry drift dump.
+if canon_rhs is not None:
+    check(
+        "every call site is byte-identical to the canonical expression",
+        not drifted,
+        "; ".join(drifted),
+    )
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} check(s): {', '.join(failures)}")
