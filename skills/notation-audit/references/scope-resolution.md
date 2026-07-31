@@ -23,15 +23,22 @@ orphan surface for no gain.
 Claude Code names a project directory after the absolute cwd with `/` and `.` each
 replaced by `-`. Every other character, including `_` and letter case, is preserved.
 
+This one line is the canonical encoding expression:
+
 <!-- canonical-encoding -->
 ```sh
-encode_cwd() { printf '%s' "$1" | sed 's#[/.]#-#g'; }
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 ```
 
-Use it, then resolve to an **exact** path:
+**Inline it at every point of use - never call it as a helper defined elsewhere.** The Bash
+tool persists the working directory between calls but **not** shell functions or variables,
+so a function defined in one invocation is unset in the next, `$enc` expands to empty, and
+the path collapses to `$HOME/.claude/projects//memory`. That failure surfaces as "this
+project has no memory dir yet", which is indistinguishable from the dotted-path bug below.
+Re-derive the line as the **first line of the same Bash invocation** that consumes it:
 
 ```sh
-enc=$(encode_cwd "$(pwd)")
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 mem="$HOME/.claude/projects/$enc/memory"
 ls -d "$mem" 2>/dev/null || echo "no memory dir for this project yet"
 ```

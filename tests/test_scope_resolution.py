@@ -54,8 +54,14 @@ def canonical_block(path):
 
 
 def run_encode(block, arg):
-    """Execute the shipped block, then call the function it defines."""
-    script = block + '\nencode_cwd "$1"\n'
+    """Execute the shipped block against a given cwd and read back `$enc`.
+
+    The block must be self-contained - a single expression usable as the first
+    line of any Bash invocation - because the Bash tool does not persist shell
+    functions or variables between calls. So the harness only supplies the cwd
+    (as $PWD) and prints whatever the block assigned.
+    """
+    script = 'PWD="$1"\n' + block + "\nprintf '%s' \"$enc\"\n"
     out = subprocess.run(
         ["/bin/sh", "-c", script, "sh", arg], capture_output=True, text=True
     )
@@ -73,9 +79,10 @@ check(
 if len(blocks) == 1:
     block = blocks[0]
     check(
-        "block defines encode_cwd",
-        "encode_cwd()" in block,
-        "the function name other files copy verbatim",
+        "block is self-contained (no helper function)",
+        "()" not in block and "encode_cwd" not in block and "enc=" in block,
+        "must be inlinable at the point of use - shell state does not persist "
+        "between Bash calls, so a defined-elsewhere helper is always unset",
     )
     for path, expected in CASES:
         got, err = run_encode(block, path)
@@ -99,19 +106,64 @@ tracked = subprocess.run(
     ["git", "ls-files"], cwd=REPO, capture_output=True, text=True
 ).stdout.split()
 offenders = []
+scanned = []
 for rel in tracked:
     if rel.startswith("tests/") or not rel.endswith(".md"):
         continue
     body = open(os.path.join(REPO, rel), encoding="utf-8").read()
+    scanned.append(rel)
     for i, line in enumerate(body.splitlines(), 1):
         if re.search(r"projects/\*", line):
             if rel == REFERENCE_REL and line.strip() == EXEMPT_LINE:
                 continue
             offenders.append(f"{rel}:{i}: {line.strip()}")
+# Without this, an empty file list (non-git checkout, tarball, a `git ls-files`
+# that failed) leaves `offenders` empty and the row above passes having read
+# nothing at all. The scan must prove it reached the shipped markdown.
+check(
+    "the glob scan actually read the shipped markdown",
+    len(scanned) >= 5 and REFERENCE_REL in scanned,
+    f"scanned {len(scanned)} tracked .md file(s)",
+)
 check(
     "no shipped file resolves a project with a glob",
     not offenders,
     "; ".join(offenders),
+)
+
+print("\nscope-resolution: the dot-less sed is banned repo-wide")
+# `sed 's#/#-#g'` is the original bug: it never replaces the dot, so any dotted
+# path resolves to a directory that does not exist. Banned everywhere, not just
+# inside the canonical blocks - adding it to a new file must fail the gate.
+# scope-resolution.md must name it once, in prose, to warn against it; that
+# exemption is scoped to the ONE line that does so. tests/ is excluded because
+# this file has to name the pattern in order to ban it.
+BROKEN_SED = "s#/#-#g"
+BROKEN_SED_EXEMPT_LINE = "**Omitting the `.` replacement is the classic bug.** `sed 's#/#-#g'` maps"
+broken = []
+broken_scanned = []
+for rel in tracked:
+    if rel.startswith("tests/"):
+        continue
+    try:
+        body = open(os.path.join(REPO, rel), encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    broken_scanned.append(rel)
+    for i, line in enumerate(body.splitlines(), 1):
+        if BROKEN_SED in line:
+            if rel == REFERENCE_REL and line.strip() == BROKEN_SED_EXEMPT_LINE:
+                continue
+            broken.append(f"{rel}:{i}: {line.strip()}")
+check(
+    "the dot-less-sed scan actually read the repo",
+    len(broken_scanned) >= 5 and REFERENCE_REL in broken_scanned,
+    f"scanned {len(broken_scanned)} tracked file(s)",
+)
+check(
+    "no shipped file uses the dot-less encoding",
+    not broken,
+    "; ".join(broken),
 )
 
 print("\nscope-resolution: no drift between copies of the canonical block")

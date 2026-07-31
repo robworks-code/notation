@@ -32,15 +32,19 @@ tree - one that most repos do not gitignore, and that on a public repo is an unw
 tool-generated file. Send it to a project-keyed directory under `~/.claude/` instead:
 
 ```sh
-bk="$HOME/.claude/notation-backups/$(encode_cwd "$(pwd)")"
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+bk="$HOME/.claude/notation-backups/$enc"
 mkdir -p "$bk"
 cp ./CLAUDE.md "$bk/CLAUDE.md.bak.$stamp"
 ```
 
-`encode_cwd` is defined in `scope-resolution.md`. Use the **same `$stamp`** across both
-scopes so the whole run restores together. Never write a `.bak` into the repo working
-tree, and never delete a stray one you find there - move it (see `audit-checklist.md`
-check 7).
+The encoding rule is stated once in `scope-resolution.md`; **inline it** as above rather
+than calling a helper, because shell functions and variables do not survive from one Bash
+invocation to the next. For the same reason, record the value of `$stamp` and substitute it
+literally in any later invocation. Use the **same `$stamp`** for the whole run, across both
+scopes, so the set restores together and there is no ambiguity about which snapshot to roll
+back to. Never write a `.bak` into the repo working tree, and never delete a stray one you
+find there - move it (see `audit-checklist.md` check 7).
 
 **Back up before the first write, never after** - a snapshot of an already-edited file
 restores the damage. This timing rule applies to both global-scope and project-scope

@@ -82,7 +82,8 @@ List backups from **both** scopes:
 
 ```bash
 ls ~/.claude/CLAUDE.md.bak.* 2>/dev/null
-ls ~/.claude/notation-backups/"$(encode_cwd "$(pwd)")"/ 2>/dev/null
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+ls ~/.claude/notation-backups/"$enc"/ 2>/dev/null
 ```
 
 If there are several in either place, offer to prune the older ones, keeping the most recent one or two per scope. (These are the safety net for the preservation rule - never prune below the most recent one or two.) A backup found **inside the repo working tree** (`./CLAUDE.md.bak.*`) is a defect, not clutter: report it, offer to move it under `~/.claude/notation-backups/`, and note that older plugin versions created it there.

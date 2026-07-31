@@ -59,11 +59,15 @@ Before proposing anything, ground yourself in two sources so proposals are real,
 
 <!-- canonical-encoding -->
 ```sh
-encode_cwd() { printf '%s' "$1" | sed 's#[/.]#-#g'; }
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 ```
 
+**Inline that line at every point of use.** The Bash tool does not persist shell functions or
+variables between calls, so a helper defined here would be unset everywhere else and `$enc`
+would expand to empty. Repeat it as the first line of each invocation that needs it:
+
 ```bash
-enc=$(encode_cwd "$(pwd)")
+enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 tx=$(ls -t ~/.claude/projects/"$enc"/*.jsonl 2>/dev/null | head -1)
 echo "transcript: $tx"
 ```
@@ -157,11 +161,12 @@ If the learning is already covered, drop the proposal - do not restate it. If it
 - **When a note is the destination because you relocated bulk from CLAUDE.md, move every fact verbatim** - relocation must not lose detail.
 
 **Project memory:**
-- Find the per-project memory dir by **exact path**, using the `encode_cwd` helper defined
-  in Step 1 - never a `*` glob, which matches every project on the machine and cannot
-  identify this one:
+- Find the per-project memory dir by **exact path**, re-deriving Step 1's encoding line in
+  this same invocation - never a `*` glob, which matches every project on the machine and
+  cannot identify this one:
   ```bash
-  mem="$HOME/.claude/projects/$(encode_cwd "$(pwd)")/memory"
+  enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+  mem="$HOME/.claude/projects/$enc/memory"
   ls -d "$mem" 2>/dev/null
   ```
   If it does not exist, this project has no memory yet - ask the user before creating one.
@@ -206,17 +211,20 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 
 2. **If `Review by tier`:** for each tier with proposals, ask one **multi-select** question whose options are that tier's proposal titles (with the why as each option's description). If a tier has more than 4 proposals, ask it in successive batches of 4 (the tool caps options at 4). Checked options are applied; unchecked are dropped.
 
-3. **Back up every file that will lose content - before writing anything.** Snapshot `~/.claude/CLAUDE.md` if an approved change edits its rules inline, and equally any note or memory file an approved `UPDATE` will delete a line from. Use one stamp for the whole run:
+3. **Back up every file that will lose content - before writing anything.** Snapshot `~/.claude/CLAUDE.md` if an approved change edits its rules inline, and equally any note or memory file an approved `UPDATE` will delete a line from. Use one stamp for the whole run, and **record its value** - shell variables do not survive to the next Bash call, so later invocations substitute the literal stamp:
    ```bash
-   stamp=$(date +%Y%m%d-%H%M%S)
+   stamp=$(date +%Y%m%d-%H%M%S); echo "$stamp"
    cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp
    ```
 
    A **project-scope** source (`./CLAUDE.md`, a project memory file) is backed up outside
-   the repo, so notation never leaves an artifact in the working tree:
+   the repo, so notation never leaves an artifact in the working tree. Re-derive the
+   encoding line here and substitute the recorded stamp value literally - neither the
+   function nor `$stamp` survives from the previous invocation:
    ```bash
-   bk="$HOME/.claude/notation-backups/$(encode_cwd "$(pwd)")"; mkdir -p "$bk"
-   cp ./CLAUDE.md "$bk/CLAUDE.md.bak.$stamp"
+   enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
+   bk="$HOME/.claude/notation-backups/$enc"; mkdir -p "$bk"
+   cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
    ```
 
    A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.
