@@ -225,6 +225,7 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
    enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
    bk="$HOME/.claude/notation-backups/$enc"; mkdir -p "$bk"
    cp ./CLAUDE.md "$bk/CLAUDE.md.bak.20260730-141530"
+   cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.20260730-141530"
    ```
 
    A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.

@@ -89,9 +89,15 @@ somewhere, but it holds everywhere - global scope.
 1. **A global note never takes a repo as its subject.** `~/.claude/notes/<topic>.md` is
    about a tool, platform, API, SDK, or service. If its content only makes sense inside
    one repo, it is misfiled - see `audit-checklist.md` check 9.
-2. **Project content never relocates into `~/.claude/notes/`.** When a project file needs
-   to shed weight, its detail goes to `./.claude/docs/`, the repo's real docs, or project
-   memory. Relocating it globally would leak one repo into every session.
+2. **Project-scoped content never relocates into `~/.claude/notes/`.** Project-scoped means
+   the fact stops being true in another repo. When a project file needs to shed weight, that
+   detail goes to `./.claude/docs/`, the repo's real docs, or project memory. Relocating it
+   globally would leak one repo into every session. This is a rule about the fact's scope,
+   not about the file it currently sits in - **the one exception is a fact that is already
+   mis-scoped**: a project memory file holding a learning that stays true in any repo is
+   global content that merely lives in a project home, and moving it to
+   `~/.claude/notes/` (or inline, if it fires every session) is the fix, not a violation -
+   see `audit-checklist.md` check 9, second bullet. Test the fact, not the path.
 3. **Deltas never pool across scopes.** A global-file delta and a project-file delta are
    different currencies; only global ones feed the no-growth gate. See
    `size-budget.md` and `output-format.md`.

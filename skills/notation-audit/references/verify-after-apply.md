@@ -7,7 +7,8 @@ check passes with flying colors. **Shrinking is the failure signature of data lo
 alone can never be the proof.
 
 Throughout this file, **source** is whichever file content is leaving (`~/.claude/CLAUDE.md`, a
-project `./CLAUDE.md` under strict mode, or a note being consolidated away) and **destination** is
+project `./CLAUDE.md` under strict mode, a note being consolidated away, or a **project memory
+file** a scope-leakage move is emptying - see `audit-checklist.md` check 9) and **destination** is
 wherever it lands. The procedure is the same for all of them; only the paths change.
 
 Run the checks below in order, every time changes are applied.
@@ -26,16 +27,18 @@ cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak.$stamp        # if it is a source
 cp ~/.claude/notes/foo.md ~/.claude/notes/foo.md.bak.$stamp  # ditto, per source note
 ```
 
-**Project-scope sources go outside the repo.** A strict run on `./CLAUDE.md` writes a
-backup, and writing it beside the file drops an untracked artifact into the user's working
+**Project-scope sources go outside the repo.** There are two of them: `./CLAUDE.md` under a
+strict run, and a **project memory file** that check 9 is moving a globally-true fact out of.
+Writing a backup beside `./CLAUDE.md` drops an untracked artifact into the user's working
 tree - one that most repos do not gitignore, and that on a public repo is an unwanted
-tool-generated file. Send it to a project-keyed directory under `~/.claude/` instead:
+tool-generated file. Send both to a project-keyed directory under `~/.claude/` instead:
 
 ```sh
 enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
 bk="$HOME/.claude/notation-backups/$enc"
 mkdir -p "$bk"
 cp ./CLAUDE.md "$bk/CLAUDE.md.bak.$stamp"
+cp "$HOME/.claude/projects/$enc/memory/<file>.md" "$bk/<file>.md.bak.$stamp"   # per source memory file
 ```
 
 The encoding rule is stated once in `scope-resolution.md`; **inline it** as above rather

@@ -6,7 +6,7 @@ Walk these checks in order. For each finding, record the file path, the problem,
 
 **Net size of the GLOBAL file must not grow (applies to every fix below).** Preservation is not a licence to grow the every-session file. Each finding carries a signed character delta against `~/.claude/CLAUDE.md`, and the run's total must be `<= 0`; when the file is over target the total must be negative enough to land under it. Additive findings (check 2, and any promoted global rule) must be offset by moves in the same run. Full budget and tactics: `size-budget.md`.
 
-**This rule is about `~/.claude/CLAUDE.md` only.** A project's own `./CLAUDE.md` has a soft, advisory budget with real headroom - see check 8. Checks 1, 2 and 5 below all operate on the global file; do not run them against a project file. (Under strict mode, check 8 scores the project file against the global file's *rules* - it still never runs checks 1, 2 or 5, because those relocate into the global `~/.claude/notes/`.)
+**This rule is about `~/.claude/CLAUDE.md` only.** A project's own `./CLAUDE.md` has a soft, advisory budget with real headroom - see check 8. Checks 1, 2 and 5 below all operate on the global file; do not run them against a project file - **except check 5's cross-scope half** ("Compare across scopes too"), which deliberately compares project memory against the global notes to find the same fact filed in both scopes. That half reads project files by design; it is exempt because it does not relocate anything into the global tier - its safe deletion is the *global* copy. (Under strict mode, check 8 scores the project file against the global file's *rules* - it still never runs checks 1, 2 or the global-tier half of 5, because those relocate into the global `~/.claude/notes/`.)
 
 ## 0. Size budget (sets the goal for the whole run)
 
@@ -111,12 +111,12 @@ Content in the scope that does not match the fact. Both directions are real, and
 When the fact appears in only one location (the wrong scope) - if it already exists in both scopes, check 5 handles the mismatch instead:
 
 - **A global note whose subject is one repo.** `~/.claude/notes/<topic>.md` is about a tool, platform, API, SDK, or service. Signals: the note names a repo, a repo-local path, a service name that exists only in one project, or a deployment detail true of exactly one deploy. Flag to **move** into that project's memory (or `./.claude/docs/` if it is long-form), leaving the genuinely tool-general parts behind. Only propose this when the project is identifiable - if the note does not say which repo it belongs to, flag it `tidy` and ask, rather than guessing a destination.
-- **Project memory holding a global fact.** A memory file that would stay true in any repo belongs in `~/.claude/notes/` or, if it fires every session, inline. Flag to move and drop the `MEMORY.md` pointer with it.
+- **Project memory holding a global fact.** A memory file that would stay true in any repo belongs in `~/.claude/notes/` or, if it fires every session, inline. Flag to move and drop the `MEMORY.md` pointer with it. This is the named exception to never-cross rule 2 (`scope-resolution.md`): the rule forbids relocating project-**scoped** content globally, and this fact was never project-scoped - it was only filed that way. The memory file is a **project-scope source** and must be backed up to `~/.claude/notation-backups/<encoded-cwd>/` before the removal, like any other source (`verify-after-apply.md` check 0).
 - **A project fact duplicated into a global note.** Handled as check 5's cross-scope case; count it there, not twice.
 
 **A whole note is rarely uniformly misfiled.** The usual shape is a tool note with two or three repo-bound entries in it. Propose moving those entries, not the file - and relocate them verbatim, under the same preservation rule as every other move.
 
-Deltas from this check are per-file and never pooled with the other scope's - a global note shrinking does not pay for project memory growing, and neither feeds the global CLAUDE.md no-growth gate unless the row actually touches `~/.claude/CLAUDE.md` (it does when a note is emptied entirely and its index line goes with it).
+Deltas from this check are per-file and never pooled with the other scope's - a global note shrinking does not pay for project memory growing, and neither feeds the global CLAUDE.md no-growth gate unless the row actually touches `~/.claude/CLAUDE.md` (it does when a note is emptied entirely and its index line goes with it). Carry a note-file row in the report's `file` column as `notes`, never `global` - `global` is reserved for rows against `~/.claude/CLAUDE.md` and is what the gate sums (`output-format.md` > Zone 2).
 
 ## Reporting
 
