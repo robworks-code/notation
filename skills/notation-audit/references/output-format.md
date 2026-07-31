@@ -10,7 +10,14 @@ One or two lines. State the session read (or audit scope) and the tally, using `
 separator and `->` for routing.
 
 - Capture: `Read: <session-type> session (<N> turns) - <M> learnings -> <a> global - <b> notes - <c> memory`
-- Audit:   `Audited: CLAUDE.md + <N> notes + <M> memories - <x> move - <y> fix - <z> tidy`
+- Audit:   `Audited: global (CLAUDE.md + <N> notes) + project <abs-path> (<M> memories) - <x> move - <y> fix - <z> tidy`
+
+**The audit always names the project it resolved**, by absolute path, even when it found
+no project memory (`project <abs-path> (no memory dir)`). A run in the wrong cwd is
+otherwise invisible in the output, and the two scopes are scored separately - the reader
+has to be able to see which project's files the project rows are about. When the session
+has additional working directories, this is the primary cwd; say so if it is not the
+directory the user was working in. See `scope-resolution.md`.
 
 If a tier has zero items, omit it from the tally rather than printing `0`.
 
