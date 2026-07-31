@@ -78,15 +78,76 @@ Do not treat undated legacy content as a problem to rewrite; this check only nud
 
 ## 7. Backup clutter (tidy)
 
-List backups from **both** scopes:
+Backups are **two different artifact classes** and they get opposite treatment. Sorting
+them is the whole check; get this wrong and the audit proposes destroying history.
+
+- A **config snapshot** (`~/.claude/CLAUDE.md.bak.<stamp>`) is the only record of what
+  the file said before an edit. Users accumulate these deliberately, over months, and
+  commonly manage them with their own tooling. **Never propose deleting one.**
+- A **run backup** is the rollback window for one notation run: the sources check 0 of
+  `verify-after-apply.md` copied before writing. Once that run's preservation checks
+  passed, its window has closed and the file is genuinely spent. These are the only
+  backups this check may offer to remove.
+
+### List every family
 
 ```bash
-ls ~/.claude/CLAUDE.md.bak.* 2>/dev/null
+find ~/.claude -maxdepth 1 -name 'CLAUDE.md.bak.*' 2>/dev/null          # 1 config snapshots
+find ~/.claude/notes -maxdepth 1 -name '*.md.bak.*' 2>/dev/null         # 2 run backups (note sources)
 enc=$(printf '%s' "$PWD" | sed 's#[/.]#-#g')
-ls ~/.claude/notation-backups/"$enc"/ 2>/dev/null
+find ~/.claude/notation-backups/"$enc" -type f 2>/dev/null              # 3 run backups (this project)
+find ~/.claude/notation-backups -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l
+du -sh ~/.claude/notation-backups 2>/dev/null                           # 4 all projects, aggregate
+find . -maxdepth 1 -name 'CLAUDE.md.bak.*' 2>/dev/null                  # 5 in-repo, always a defect
 ```
 
-If there are several in either place, offer to prune the older ones, keeping the most recent one or two per scope. (These are the safety net for the preservation rule - never prune below the most recent one or two.) A backup found **inside the repo working tree** (`./CLAUDE.md.bak.*`) is a defect, not clutter: report it, offer to move it under `~/.claude/notation-backups/`, and note that older plugin versions created it there.
+Use `find`, not a bare `ls` glob. The Bash tool runs zsh, where a glob matching nothing
+aborts with `no matches found` **before the command runs** - and `2>/dev/null` does not
+suppress it, because the error is the shell's, not `ls`'s. The normal state here is "no
+backups", so a glob recipe prints an error on the healthy path.
+
+### Defer to an existing rotation policy - check before proposing anything
+
+```bash
+ls ~/.claude/bin/rotate-backups.sh 2>/dev/null
+/usr/bin/grep -n -i 'rotate-backups\|prune-days' ~/.claude/CLAUDE.md
+```
+
+If either turns up a policy, **the user has already reasoned about this and their policy
+wins.** Report the state as one informational ledger line - count, total size, how many
+are already compressed - and raise no finding. Do not restate their policy back to them
+as a proposal, and never contradict it: a real setup found this way keeps the 10 newest
+uncompressed for diffing, gzips the rest, and deletes nothing without an explicit age
+threshold. An audit that read its own advice literally against that setup would have
+proposed deleting 103 of 105 files.
+
+### What may be proposed, per family
+
+1. **Config snapshots** - informational only, always. If there is no rotation policy and
+   the count is large, the safe offer is **compression** (`gzip -9` all but the newest
+   few), which is lossless and reversible. Deletion is offered only if the user asks for
+   it and only with an explicit age threshold they name - never a count this skill
+   invented, and never as a default. `keep the most recent one or two` was that invented
+   number; it is gone.
+2. **Note run backups** (`~/.claude/notes/*.md.bak.*`) - offer to delete those whose run
+   already verified. They sit inside the directory a human browses and the audit globs;
+   they do not match `*.md`, so they are never misread as notes, but they do accumulate
+   once check 9 makes note-sourced moves routine.
+3. **This project's run backups** - same rule. Deleting the newest set before this run's
+   own verification has passed removes the safety net the run depends on, so prune at
+   the **end** of a run, never at the start.
+4. **Other projects' backup dirs** - report the aggregate (directory count and total
+   size) and stop. **Never delete another project's backups**: you cannot verify from
+   here that its run passed, and by design an audit only resolves the current project
+   (`scope-resolution.md`). Hand the number to the user and let them decide.
+5. **A backup inside the repo working tree** (`./CLAUDE.md.bak.*`) is a defect, not
+   clutter: report it, offer to **move** it under `~/.claude/notation-backups/<enc>/`,
+   and note that plugin versions before 0.10.0 wrote it there. Move it - do not delete
+   it - and never delete a stray one you did not create.
+
+**A `.bak` deletion is a real deletion.** It gets everything check 5's deletions get:
+named individually in the report, justified by its run having verified, applied only on
+an explicit approval, and never bundled incidentally into another finding.
 
 ## 8. Project CLAUDE.md weight (advisory)
 

@@ -4,7 +4,8 @@
 #   ./scripts/verify.sh
 #
 # Checks: manifest validity, ASCII-only content, resolvable cross-references
-# between skill files, and the preservation-procedure mutation tests.
+# between skill files, scope resolution, the backup-listing recipe, and the
+# preservation-procedure mutation tests.
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -62,6 +63,9 @@ PY
 
 step "scope-resolution tests"
 python3 tests/test_scope_resolution.py || bad "scope-resolution tests"
+
+step "backup-lifecycle tests"
+python3 tests/test_backup_lifecycle.py || bad "backup-lifecycle tests"
 
 step "preservation-procedure mutation tests"
 python3 tests/test_preservation_probe.py || bad "preservation mutation tests"

@@ -56,6 +56,15 @@ find there - move it (see `audit-checklist.md` check 7).
 restores the damage. This timing rule applies to both global-scope and project-scope
 backups.
 
+**These are a rollback window, not an archive.** Every backup this step writes exists to
+undo *this* run, and once checks 1-5 below have passed it is spent. Say so when the run
+ends - name the stamp and offer to remove that run's backups - so they do not accumulate
+in `~/.claude/notes/` and under `~/.claude/notation-backups/`. Two hard limits: never
+prune before the run's own verification has passed, and never touch
+`~/.claude/CLAUDE.md.bak.*`, which is a different artifact entirely - the user's own
+history of that file, frequently managed by their own rotation tooling. The full sorting
+rule is `audit-checklist.md` check 7.
+
 Destinations do not need a backup (they are appended to, not rewritten), but note the byte size of
 each one now - check 2 uses it.
 
