@@ -198,6 +198,75 @@ if len(blocks) == 1 and len(copies) == 1:
         "the two copies have drifted",
     )
 
+print("\nscope-resolution: every encoding call site matches the canonical one")
+# The encoding cannot be a helper (shell state does not persist between Bash
+# calls), so it is inlined at every point of use - currently nine of them. The
+# marker-based check above only covers the two marked copies; the ban below only
+# covers one historically broken literal. Neither catches a call site drifting
+# into a DIFFERENTLY wrong form (`sed 's|/|-|g'`, `tr '/.' '--'`,
+# `${PWD//\//-}`, or a dropped trailing `g`), which fails exactly like the
+# original bug. So: find every site by a deliberately LOOSE signal, then require
+# each to be byte-identical to the canonical expression.
+#
+# The signal must stay loose. A detector that only recognises the correct form
+# would skip a drifted site instead of failing on it - a guard that passes by
+# not looking. Anything mentioning the cwd, or assigning `enc`, is a candidate,
+# and a candidate the extractor cannot parse is an offender rather than a skip.
+CANDIDATE = re.compile(r"\benc=|\$PWD|\$\(pwd\)|`pwd`|\bpwd\b")
+# RHS of an `enc=` assignment: a command substitution, a parameter expansion, or
+# a bare word. The `$(...)` form tolerates no nested `)`, which the canonical
+# expression does not have - a site that grew one is unparseable here and is
+# therefore reported, not skipped.
+ASSIGN = re.compile(r"\benc=(\$\([^)]*\)|\$\{[^}]*\}|[^\s;`]+)")
+canon_rhs = blocks[0].strip().split("=", 1)[1] if len(blocks) == 1 else None
+
+# Every file expected to carry at least one call site. Listed so that deleting a
+# site (or a scan that silently reads nothing) fails instead of passing with an
+# empty offender list.
+EXPECTED_SITE_FILES = {
+    "commands/notate.md",
+    "skills/notation-audit/SKILL.md",
+    "skills/notation-audit/references/scope-resolution.md",
+    "skills/notation-audit/references/audit-checklist.md",
+    "skills/notation-audit/references/verify-after-apply.md",
+}
+sites = []
+drifted = []
+for rel in tracked:
+    if rel.startswith("tests/"):
+        continue
+    try:
+        body = open(os.path.join(REPO, rel), encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    for i, line in enumerate(body.splitlines(), 1):
+        if not CANDIDATE.search(line):
+            continue
+        found = ASSIGN.findall(line)
+        if not found:
+            # Mentions the cwd but assigns no `enc` - an encoding written under
+            # another name, or prose that should not be naming $PWD at all.
+            drifted.append(f"{rel}:{i}: unrecognized form: {line.strip()}")
+            continue
+        for rhs in found:
+            sites.append((rel, i))
+            if rhs != canon_rhs:
+                drifted.append(f"{rel}:{i}: {rhs}")
+
+site_files = {rel for rel, _ in sites}
+check(
+    "the call-site scan found every file expected to carry one",
+    len(sites) >= 9 and EXPECTED_SITE_FILES <= site_files,
+    f"found {len(sites)} site(s) in {sorted(site_files)}; "
+    f"missing {sorted(EXPECTED_SITE_FILES - site_files)}",
+    info=f"{len(sites)} call site(s) across {len(site_files)} file(s)",
+)
+check(
+    "every call site is byte-identical to the canonical expression",
+    not drifted,
+    "; ".join(drifted),
+)
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} check(s): {', '.join(failures)}")

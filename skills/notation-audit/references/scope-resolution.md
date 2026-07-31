@@ -43,6 +43,12 @@ mem="$HOME/.claude/projects/$enc/memory"
 ls -d "$mem" 2>/dev/null || echo "no memory dir for this project yet"
 ```
 
+`scripts/verify.sh` enforces this: it finds every call site in the repo by a loose
+signal (any line naming the cwd or assigning `enc`) and requires each to be
+byte-identical to the block above. A site rewritten into a different-but-plausible
+form - another `sed` delimiter, `tr`, `${PWD//\//-}`, a dropped trailing `g` - fails
+the gate rather than shipping a second encoding rule.
+
 **Never resolve with a `*` glob.** `ls -d ~/.claude/projects/*/memory` matches every
 project on the machine - 115 of them on a mature setup - so it cannot identify the
 current one, and acting on its output edits some other repo's memory.
