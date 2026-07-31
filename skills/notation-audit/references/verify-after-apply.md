@@ -42,6 +42,10 @@ scopes so the whole run restores together. Never write a `.bak` into the repo wo
 tree, and never delete a stray one you find there - move it (see `audit-checklist.md`
 check 7).
 
+**Back up before the first write, never after** - a snapshot of an already-edited file
+restores the damage. This timing rule applies to both global-scope and project-scope
+backups.
+
 Destinations do not need a backup (they are appended to, not rewritten), but note the byte size of
 each one now - check 2 uses it.
 
