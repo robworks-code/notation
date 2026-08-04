@@ -10,6 +10,21 @@ import os
 from . import measure
 
 
+class RunLedgerError(Exception):
+    """Base exception for ledger-format errors (JSON or structure)."""
+    pass
+
+
+class RunLedgerJSONError(RunLedgerError):
+    """Ledger file exists but contains invalid JSON."""
+    pass
+
+
+class RunLedgerInvalidError(RunLedgerError):
+    """Ledger file is valid JSON but is not a valid ledger structure."""
+    pass
+
+
 def runs_dir():
     override = os.environ.get("NOTATION_RUNS_DIR")
     if override:
@@ -59,14 +74,34 @@ def open_run(targets, run_id, now):
 
 
 def load(run_id):
-    """-> the ledger. Raises LookupError rather than inventing an empty one."""
+    """-> the ledger.
+
+    Raises three distinct errors:
+    - LookupError if run id was never opened (file does not exist)
+    - RunLedgerJSONError if file is not valid JSON
+    - RunLedgerInvalidError if JSON is valid but not a valid ledger structure
+    """
     p = _path(run_id)
     if not os.path.isfile(p):
         raise LookupError(
             "no ledger for run '{}' at {}; refusing to guess".format(run_id, p)
         )
-    with open(p, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    try:
+        with open(p, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except json.JSONDecodeError as e:
+        raise RunLedgerJSONError(
+            "ledger for run '{}' at {} is not valid JSON: {}".format(run_id, p, e)
+        )
+
+    required_keys = {"run_id", "opened_at", "targets", "proposals", "closed"}
+    if not isinstance(data, dict) or not required_keys.issubset(data.keys()):
+        missing = required_keys - set(data.keys() if isinstance(data, dict) else [])
+        raise RunLedgerInvalidError(
+            "ledger for run '{}' is invalid; missing keys: {}".format(run_id, missing)
+        )
+
+    return data
 
 
 def add_proposal(run_id, proposal):
