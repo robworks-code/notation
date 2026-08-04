@@ -62,6 +62,14 @@ with tempfile.TemporaryDirectory() as d:
     check("an unknown subcommand exits 2", rc_bad == 2, info="rc={}".format(rc_bad))
     check("and explains on stderr", bool(err_bad.strip()))
 
+    rc_none_cmd, out_none_cmd, err_none_cmd = run([], env)
+    check("no subcommand at all exits 2", rc_none_cmd == 2,
+          info="rc={}".format(rc_none_cmd))
+    check("no subcommand emits nothing on stdout", out_none_cmd == "",
+          detail=repr(out_none_cmd[:120]))
+    check("no subcommand explains on stderr", "no subcommand given" in err_none_cmd,
+          detail=repr(err_none_cmd[:120]))
+
     rc_missing, _, _ = run(["close", "--run-id", "never-opened"], env)
     check("an unknown run id exits 2, not 1", rc_missing == 2,
           detail="a missing ledger is an error, not a gate refusal")
@@ -161,8 +169,8 @@ with tempfile.TemporaryDirectory() as d:
 
         rc_g, out_g, err_g = run(
             ["gate", "--run-id", "never-opened-global", "--target", global_target], asym_env)
-        check("a global target with no ledger blocks (exit non-zero, not 0 or 1)",
-              rc_g not in (0, 1), info="rc={}".format(rc_g))
+        check("a global target with no ledger blocks (exit 2)",
+              rc_g == 2, info="rc={}".format(rc_g))
         check("and explains the block on stderr", "blocking" in err_g,
               detail=repr(err_g[:200]))
         check("stdout stays empty on the blocked path", out_g == "",
@@ -170,8 +178,8 @@ with tempfile.TemporaryDirectory() as d:
 
         rc_none, _, err_none = run(
             ["gate", "--run-id", "never-opened-no-target"], asym_env)
-        check("an unspecified target also blocks (treated as global)",
-              rc_none not in (0, 1), info="rc={}".format(rc_none))
+        check("an unspecified target also blocks (treated as global, exit 2)",
+              rc_none == 2, info="rc={}".format(rc_none))
         check("and says so on stderr", "blocking" in err_none,
               detail=repr(err_none[:200]))
 
