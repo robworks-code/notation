@@ -76,6 +76,9 @@ python3 tests/test_preservation_probe.py || bad "preservation mutation tests"
 step "detection-coverage tests"
 python3 tests/test_detection_coverage.py || bad "detection-coverage tests"
 
+step "command-doc-drift tests"
+python3 tests/test_command_doc_drift.py || bad "command-doc-drift tests"
+
 step "notation_core tests"
 python3 tests/test_core_measure.py        || bad "core-measure tests"
 python3 tests/test_core_route.py          || bad "core-route tests"

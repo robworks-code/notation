@@ -86,9 +86,9 @@ wc -c ~/.claude/CLAUDE.md; wc -c ./CLAUDE.md 2>/dev/null
 ```
 The second measurement is what Steps 3 and 6 branch on - take the file's existence as the test, not whether git tracks it (it is commonly gitignored yet still loaded). If there is no `./CLAUDE.md`, there is nothing to report and the project-file rules simply do not apply.
 
-`~/.claude/CLAUDE.md` loads into every prompt of every session, so it is budgeted: target **<= 40,000 chars** (Claude Code's large-memory-file warning floor). Carry the measured number into Step 3's budget gate and Step 6's scorecard. Full budget: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/size-budget.md`.
+`~/.claude/CLAUDE.md` loads into every prompt of every session, so it is budgeted against the global target the core enforces (Claude Code's large-memory-file warning floor) - the figure lives once, in `scripts/notation_core/constants.py` (`GLOBAL_TARGET_CHARS`), and is not restated here. Carry the measured number into Step 3's budget gate and Step 6's scorecard; Step 2.5's `gate` call is what actually enforces it. Full budget: `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/size-budget.md`.
 
-**This budget is the GLOBAL file's alone.** A repo's own `./CLAUDE.md` loads only inside that repo, has a soft cap of 40,000 with a silent band under 20,000, and is never gated by Step 3. Adding to a project CLAUDE.md is normal and needs no justification.
+**This budget is the GLOBAL file's alone.** A repo's own `./CLAUDE.md` loads only inside that repo, has its own soft cap with a lower silent band beneath it (`PROJECT_ADVISORY_CHARS` and `PROJECT_SILENT_CHARS` in `constants.py` - not restated as numbers here), and is never gated by Step 3. Adding to a project CLAUDE.md is normal and needs no justification.
 
 ## Step 2 - Extract candidate learnings as structured proposals
 
@@ -110,6 +110,48 @@ Turn each survivor into a **proposal** with these fields - you will reuse them v
 - **confidence** - high / med / low (how sure you are it recurs and is correctly placed)
 - **diff** - the concrete text to add or change, and the exact destination path
 - **delta** - the proposal's signed character effect on `~/.claude/CLAUDE.md`, counted from the diff text you have already drafted (capture always has its diff in hand, so this number is measured, not estimated). Non-zero for an inline global rule and for a new note (which costs a Topical Notes Index line); `0` for everything else. Step 3's budget gate and Step 6's tables and ledger both read this field.
+
+## Step 2.5 - Open the run and measure (the core, not arithmetic in your head)
+
+All measurement, banding, and pricing comes from `scripts/notation-core.py`.
+Do not compute a character count, a band, or a delta yourself - a figure you
+derived is indistinguishable in the report from one that was measured, and the
+whole point of the core is that the audit and the capture agree.
+
+`$NOTATION` below is `${CLAUDE_PLUGIN_ROOT}`, this plugin's install root.
+
+Open the run once, holding the run id for the rest of the flow:
+
+```sh
+python3 "$NOTATION/scripts/notation-core.py" open \
+  --target ~/.claude/CLAUDE.md --run-id "$RUN" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+Then, per proposal, route it, price it, and record the price into the run -
+`price` only computes the delta, `price-record` is what makes the gate able to
+see it, so a proposal that skips this step is invisible to the whole-run gate:
+
+```sh
+python3 "$NOTATION/scripts/notation-core.py" route \
+  --text-file "$P" --target ~/.claude/CLAUDE.md
+python3 "$NOTATION/scripts/notation-core.py" price \
+  --removed "$REMOVED" --added "$DRAFTED" --target ~/.claude/CLAUDE.md
+python3 "$NOTATION/scripts/notation-core.py" price-record \
+  --run-id "$RUN" --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
+```
+
+`$DELTA` and `$BUCKET` are `price`'s own `delta` and `bucket` fields, read back
+out of the JSON it just printed - not recomputed.
+
+Act on the `band` the core returns; the thresholds live in the core and are
+deliberately not restated here:
+
+- `inline` - proceed, no friction
+- `justify` - record a one-line reason for keeping it inline
+- `must_note` - draft a note plus an inline pointer. If you are minting a NEW
+  note, first check `candidates`: a new note is allowed only when nothing fits,
+  and you must record why. Read `notes_searched` before believing an empty
+  candidate list - `0` means the search never ran, not that nothing matched.
 
 ## Step 3 - Route each learning (do NOT dump)
 
@@ -135,10 +177,10 @@ is tool-shaped - that combination is exactly how one repo's detail ends up in
 
 - **Compute its character cost** from the diff text into the proposal's `delta` field (Step 2), and carry that into the tables and the scorecard.
 - **Keep the inline line to one line.** If the learning needs more than that, the trigger goes inline and the detail goes to `notes/<topic>.md` - inline prose is the main way this file drifts.
-- **When the measured size from Step 1 is at or over 40,000 chars, the global tier is closed by default.** Re-ask the routing question with a hostile eye: if there is any plausible topic file, route it to `notes/` instead. Promote inline only if the rule genuinely fires regardless of what you are working on AND you say so in the proposal's `why`, naming the size ("CLAUDE.md is at 59,482 - promoting anyway because ...").
+- **When the measured size from Step 1 is at or over the core's global target (`GLOBAL_TARGET_CHARS` in `constants.py` - the `gate` call in Step 2.5/6 will refuse a positive net regardless), the global tier is closed by default.** Re-ask the routing question with a hostile eye: if there is any plausible topic file, route it to `notes/` instead. Promote inline only if the rule genuinely fires regardless of what you are working on AND you say so in the proposal's `why`, naming the measured size ("CLAUDE.md is at 59,482 - promoting anyway because ...").
 - **A note is not free either**: a new note also costs an index line in CLAUDE.md, so prefer appending to an existing topic file (Step 4 checks this).
 - If the file is over target, add one line to the Step 6 summary offering a `notation-audit` run to reclaim space. Do not silently push a file further over its budget.
-- **None of this applies to a project `./CLAUDE.md`.** Route a team-shared convention there without a budget argument - it costs context only in its own repo. Report its measured size only from 20,000 chars up (one ledger line, per `output-format.md`), and past 40,000 add one sentence suggesting a `notation-audit` run - as a note, never a blocker.
+- **None of this applies to a project `./CLAUDE.md`.** Route a team-shared convention there without a budget argument - it costs context only in its own repo. Report its measured size only once it reaches the core's project silent floor (`PROJECT_SILENT_CHARS`; one ledger line, per `output-format.md`), and once it reaches the project advisory line (`PROJECT_ADVISORY_CHARS`) add one sentence suggesting a `notation-audit` run - as a note, never a blocker.
 
 ## Step 4 - Dedup against the destination (targeted reads only)
 
@@ -192,11 +234,11 @@ If the learning is already covered, drop the proposal - do not restate it. If it
 
 **Global CLAUDE.md rule:** one line per concept, in the most relevant existing section. Format `` `<command/pattern>` - <brief note> ``. No verbose prose. Do not date inline rules - the every-session file stays clean. Add a rule; never silently rewrite or drop an existing one unless it is wrong or contradicted (see Step 4 / Preservation). Report the line's character cost with the diff, and honor the Step 3 budget gate - if it will not fit in one line, the detail goes to a note and only the trigger stays inline.
 
-**Project CLAUDE.md / docs:** match the file's existing style. No character budget applies - `./CLAUDE.md` loads only in its own repo and is expected to grow. If it is already past 40,000 chars (the harness's per-file warning threshold), say so in one line and offer `./.claude/docs/<name>.md` as the home for the longer material, but do not withhold the proposal over it.
+**Project CLAUDE.md / docs:** match the file's existing style. No character budget applies - `./CLAUDE.md` loads only in its own repo and is expected to grow. If it is already past the project advisory line (`PROJECT_ADVISORY_CHARS` in `constants.py`, the harness's per-file warning threshold), say so in one line and offer `./.claude/docs/<name>.md` as the home for the longer material, but do not withhold the proposal over it.
 
 ## Step 6 - Present, then apply through the interactive picker
 
-First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. **If any proposal touches `~/.claude/CLAUDE.md`** (an inline rule or a new index line), the scorecard also carries the size ledger from Step 1's measurement: `CLAUDE.md: <measured> chars -> +<cost> -> <projected> (target 40,000)`. Each diff body goes in a ` ```diff ` fenced block so `+`/`-` lines render with color coding. The diffs must appear above the questions because the picker's multi-select has no preview pane.
+First **print all proposals** using the shared format in `${CLAUDE_PLUGIN_ROOT}/skills/notation-audit/references/output-format.md`: a scorecard header, one numbered table per tier (ordered high-confidence first), then the full diffs below keyed by row number. **If any proposal touches `~/.claude/CLAUDE.md`** (an inline rule or a new index line), the scorecard also carries the size ledger from Step 1's measurement: `CLAUDE.md: <measured> chars -> +<cost> -> <projected> (target: the core's global target_chars)`. Each diff body goes in a ` ```diff ` fenced block so `+`/`-` lines render with color coding. The diffs must appear above the questions because the picker's multi-select has no preview pane.
 
 **Auto-apply mode (if `$ARGUMENTS` requested it):** after the printout, skip items 1-2 below entirely - do not call `AskUserQuestion`. Treat every proposal as approved and go straight to item 3 (back up every file that will lose content), item 4 (atomic content+index writes), item 5 (verify anything that removed content), and item 6 (summary). The summary should note it auto-applied all N proposals, and must include the re-measured CLAUDE.md size - nothing else reviews the global tier in this mode.
 
@@ -235,6 +277,27 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 
    A file that is only appended to needs no backup. **Take the snapshot before the first write** - a backup of an already-edited file restores the damage, and item 5 is what reads it.
 
+**The gate runs before any write, and its refusal is final for the global tier.**
+
+```sh
+python3 "$NOTATION/scripts/notation-core.py" gate --run-id "$RUN"
+```
+
+Exit `0` proceeds. Exit `1` means the run grows the gated global file; report the
+`reasons` verbatim and do not write to `~/.claude/CLAUDE.md`. Exit `2` is a core
+failure, not a verdict: block the global write, and say the gate could not run.
+A project-scoped write proceeds either way, with the warning shown.
+
+After the writes land, close the run:
+
+```sh
+python3 "$NOTATION/scripts/notation-core.py" close --run-id "$RUN"
+```
+
+A non-zero exit here means the edit did not land as drafted. Report the
+`findings` verbatim rather than restating the predicted numbers as if they
+happened.
+
 4. **Then apply the approved proposals.** Keep each content change atomic with its index update:
    - a note edit/create together with its Topical Notes Index line,
    - a memory file together with its `MEMORY.md` pointer.
@@ -245,7 +308,7 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 
 6. **Summary.** Report what was applied and what was skipped, grouped by tier, referencing files by absolute path.
 
-   **If anything landed in `~/.claude/CLAUDE.md`, re-measure it and print the real number** - `wc -c ~/.claude/CLAUDE.md` - as `CLAUDE.md: <before> -> <after> chars (target 40,000)`. Never report growth from the projection alone. If the after-size is at or over target, add one line offering a `notation-audit` run to reclaim space by relocating detail into notes. This matters most in auto-apply mode, where no picker stood between the proposal and the file.
+   **If anything landed in `~/.claude/CLAUDE.md`, re-measure it and print the real number** - `wc -c ~/.claude/CLAUDE.md`, cross-checked against `close`'s report - as `CLAUDE.md: <before> -> <after> chars (target: the core's global target_chars)`. Never report growth from the projection alone. If the after-size is at or over target, add one line offering a `notation-audit` run to reclaim space by relocating detail into notes. This matters most in auto-apply mode, where no picker stood between the proposal and the file.
 
 Never edit `~/.claude/settings.json` (the harness self-grant guard blocks it, and it is not a notation target).
 
