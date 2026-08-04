@@ -35,16 +35,17 @@ deployment detail. Full rule, the mirror case, and the never-cross list: `scope-
    (a cloud provider's quirk, one CLI's auth flow, one library's gotcha, one MCP server's behavior)
    -> **`~/.claude/notes/<topic>.md`** + a line in the Topical Notes Index. This is the default home for most discoveries.
 
-2b. **Is it a PROCEDURE rather than a fact** - ordered steps, a workflow, a decision tree, a checklist someone would follow start to finish?
+3. **Is it a PROCEDURE rather than a fact** - ordered steps, a workflow, a decision tree, a checklist someone would follow start to finish?
    -> **A skill**: `~/.claude/skills/<name>/SKILL.md`, with the trigger left inline and the body loaded on invocation. Notes answer "what is true about X"; skills answer "how do I do X". A long inline section whose content is steps is a skill that has not been extracted yet. Extracting one costs no index line, which makes it cheaper than a note.
+   <!-- precedence-ref: procedure-vs-surface -->
 
-3. **Is it specific to the current project** - its architecture, a decision, a non-obvious gotcha, a workflow - and NOT derivable from the code, README, or git history?
+4. **Is it specific to the current project** - its architecture, a decision, a non-obvious gotcha, a workflow - and NOT derivable from the code, README, or git history?
    -> **Project memory**: a frontmatter file in `~/.claude/projects/<encoded-cwd>/memory/` + a pointer line in `MEMORY.md`.
 
-4. **Is it a convention the rest of the team/repo needs** (build/test/deploy steps, architecture orientation)?
+5. **Is it a convention the rest of the team/repo needs** (build/test/deploy steps, architecture orientation)?
    -> **`./CLAUDE.md`** in the project (only if the repo already has one).
 
-5. **Is it a large, structured write-up** (a spec, a phase summary, an implementation guide)?
+6. **Is it a large, structured write-up** (a spec, a phase summary, an implementation guide)?
    -> **`./.claude/docs/<name>.md`** in the project.
 
 ## Tie-breakers
@@ -63,6 +64,16 @@ deployment detail. Full rule, the mirror case, and the never-cross list: `scope-
   is about 110 chars and the cost is a fact nobody finds again. Precedence:
   `size-budget.md` > "When two rules conflict".
   <!-- precedence-ref: routing-vs-index-cost -->
+- **Rule 3 (procedure) vs rule 2 (tool surface): shape wins, not position.** Most procedures
+  are also tool-tied - rule 2 names "one CLI's auth flow" and rule 4 names "a workflow" -
+  so first-match-wins would leave rule 3 dead and two sessions routing the same section to
+  opposite destinations. The test is whether ORDER is load-bearing: a sequence where
+  skipping a step breaks the outcome is a **skill**, even when it concerns exactly one
+  tool; a set of independent gotchas about that tool is a **note**, even when several are
+  phrased imperatively. Length is corroborating, not deciding - a three-step recipe stays
+  a note entry. Scope still runs first: a procedure that stops being true in another repo
+  is project memory (rule 4), never a global skill.
+  <!-- precedence-def: procedure-vs-surface -->
 
 ## Preservation (never destroy history)
 

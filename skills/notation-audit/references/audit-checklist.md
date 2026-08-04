@@ -54,20 +54,26 @@ Compute the saving by transforming every line and diffing the totals, never by e
 ```sh
 awk '/^## .*Index/{i=1; next} /^## /{i=0} i' ~/.claude/CLAUDE.md \
   | perl -ne 'BEGIN{$o=$n=$c=$skip=0}
-      next unless /^- \[/;
-      $c++; $o += length($_);
-      s{^- \[([a-z0-9-]+)\]\(notes/([a-z0-9-]+)\.md\)}
-       {$1 eq $2 ? "- $2" : do { $skip++; $& }}e;
-      $n += length($_); print;
-      END { printf STDERR "lines %d, current %d, compressed %d, saved %d, skipped %d\n",
+      if (/^- \[([^\]]+)\]\(notes\/([a-z0-9-]+)\.md\)/) {
+        my ($label, $slug) = ($1, $2);
+        (my $norm = lc $label) =~ s/[\s_]+/-/g;
+        $c++; $o += length($_);
+        if ($norm eq $slug) { s/^- \[[^\]]+\]\(notes\/[a-z0-9-]+\.md\)/- $slug/ }
+        else { $skip++ }
+        $n += length($_);
+      }
+      print;
+      END { printf STDERR "entries %d, current %d, compressed %d, saved %d, skipped %d\n",
                           $c, $o, $n, $o-$n, $skip }'
 ```
 
-The rewritten index goes to stdout and the stats to stderr, so redirect stdout to a scratch file when you want to diff it against the original. Verify by asserting the line count is unchanged and every note name still appears.
+**Every line of the section is printed, not just the entries.** Stdout is the rewritten *section* - blank lines, the convention paragraph, and entries already in bare form all pass through untouched - so redirecting it to a scratch file gives you something you can diff against the original and paste back. Filtering to matching lines would make that scratch file a truncated index, and an auditor who pasted it back would delete real entries in the one check whose premise is that it loses nothing. Verify by asserting the output has the same line count as the input section and that every note name still appears; the `current`/`compressed`/`saved` figures cover the entries only, which is what the encoding cost actually is.
 
-The `$1 eq $2` guard is load-bearing. Link text and filename are independent, so `- [claude-code](notes/claude-code-internals.md) - ...` would compress to `- claude-code - ...` and the path would no longer be derivable from the name - a silent loss, not a saving. Those lines are left in link form and counted as `skipped`; either rename the note to match its label or leave them. A `skipped` count above zero is a finding in its own right: the index labels and the filenames have drifted apart.
+The `$norm eq $slug` guard is load-bearing. Link text and filename are independent, so `- [claude-code](notes/claude-code-internals.md) - ...` would compress to `- claude-code - ...` and the path would no longer be derivable from the name - a silent loss, not a saving. Those lines are left in link form and counted as `skipped`; either rename the note to match its label or leave them. A `skipped` count above zero is a finding in its own right: the index labels and the filenames have drifted apart.
 
-`saved 0` with `lines 0` means the index is already bare (or the heading regex missed it) - report "nothing to do", not a saving. This is loss-free, relocates nothing, and needs no destination, which makes it the first index lever to reach for. It is also a different *kind* of finding from everything else in this checklist: the rest move facts, this one removes waste, so do not skip it just because no fact is in the wrong place.
+**Match the label as `[^\]]+`, not `[a-z0-9-]+`.** Real index labels carry capitals and spaces - `- [1Password CLI](notes/1password-cli.md)`, `- [Gcloud](notes/gcloud.md)`. A slug-shaped label pattern does not match those lines at all, so they are silently counted as neither compressed nor skipped, and a genuinely drifted index reports `skipped 0` and reads as clean. Normalising the label (lowercase, whitespace and underscores to hyphens) before the comparison both recovers those lines as compressible and leaves `skipped` meaning what the paragraph above says it means.
+
+`saved 0` with `entries 0` means the index is already bare (or the heading regex missed it) - report "nothing to do", not a saving. When the same run also reports hook-length compression below, measure this one first and compute that one against the compressed lines - both otherwise claim the same link-syntax bytes into the gated `global` bucket (`size-budget.md` > "When two rules conflict"). <!-- precedence-ref: encoding-vs-cap --> This is loss-free, relocates nothing, and needs no destination, which makes it the first index lever to reach for. It is also a different *kind* of finding from everything else in this checklist: the rest move facts, this one removes waste, so do not skip it just because no fact is in the wrong place.
 
 **Index-line compression (move).** The index routes; it does not teach. Measure the per-line spread (`awk`/`wc` the index section: median length, and how many lines exceed ~100 chars) before quoting a saving - the section total says nothing about how much of it is compressible. Flag lines well over the cap and propose shorter hooks that keep the same routing trigger; any detail worth keeping goes into the note itself, not the index. In a mature setup this is often the second-biggest lever after subsection moves.
 
@@ -99,7 +105,7 @@ Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CL
    ```sh
    awk -v min=600 '
      BEGIN{h="(top of file, before the first heading)"}
-     function flush(){ if(h!="" && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9-]+`/)
+     function flush(){ if(h!="" && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9:_-]+`|skills\/[a-z0-9:_-]+\//)
                        { if(c>=min) print c"\t"h; else below++ } }
      /^#+ /{ flush(); h=$0; c=0; buf="" }
      { c+=length($0)+1; buf=buf"\n"$0 }
@@ -107,20 +113,22 @@ Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CL
    ' ~/.claude/CLAUDE.md | sort -rn
    ```
 
-   Two details decide whether this reports anything real:
+   Three details decide whether this reports anything real:
 
+   - **The citation pattern must admit a qualified skill name.** Plugin skills are named `plugin:skill` - `` skill `superpowers:brainstorming` `` - which is how Claude Code refers to them and how an inline section would cite one. A `[a-z0-9-]+` class has no `:`, so exactly the sections this detector was added for go unmatched and the run looks clean. Allow `:` and `_`, and match a `skills/<name>/` path too, since a section that names the file rather than the skill is the same citation.
    - **It must break on every heading level (`^#+ `), not just `### `.** Resetting only on `###` makes each `##` heading and all its content spill into the *preceding* `###` section's buffer. On a file whose last `###` section is followed by a large `##` index, that one section absorbs the whole tail and ranks first by a wide margin - so the top-ranked proposal is to relocate the index under an unrelated heading. Everything before the first heading, and every `##` section that is not itself under a `###`, is also invisible to the `###`-only form; seed `h` in `BEGIN` so the preamble is a testable unit.
    - **`min` separates a stale duplicate from the healthy end state.** A trigger line plus a `Full reference: notes/x.md` pointer is exactly what this checklist prescribes as *correct*, and it matches the citation pattern just as well as a full inline copy does. Without a floor the detector fires on nearly every section and ranks nothing. The size *is* the signal: what you are looking for is body sitting alongside the pointer. Sections under the floor are counted to stderr rather than dropped silently - a large `below` count with an empty result means the setup is healthy, not that the detector failed.
 
 2. **The relocation breadcrumb.** A note or skill section headed `(relocated from CLAUDE.md ...)` whose distinctive text is STILL in CLAUDE.md is a **proven** duplicate - the relocation appended but never removed. Near-zero false positives, because the heading is a claim the move completed.
 
    ```sh
-   grep -rlE '^#+ .*relocated from CLAUDE\.md' ~/.claude/notes ~/.claude/skills 2>/dev/null
+   grep -rlE '^#+ .*relocated from CLAUDE\.md' \
+        ~/.claude/notes ~/.claude/skills ~/.claude/plugins 2>/dev/null
    # then, for EACH breadcrumbed section, probe a distinctive line
    # from THAT section (not from elsewhere in the note) against ~/.claude/CLAUDE.md
    ```
 
-   Anchor the pattern to a heading. Unanchored, it also matches prose that merely *discusses* relocation, and a note that documents this checklist matches itself. Pass directories to `grep -r` rather than globbing `~/.claude/skills/*/SKILL.md`: under zsh an unmatched glob aborts the whole command before `grep` runs, so a machine with no personal skills dir silently skips the notes half too - the exact clean-looking empty run this check exists to prevent.
+   Anchor the pattern to a heading. Unanchored, it also matches prose that merely *discusses* relocation, and a note that documents this checklist matches itself. Pass directories to `grep -r` rather than globbing `~/.claude/skills/*/SKILL.md`: under zsh an unmatched glob aborts the whole command before `grep` runs, so a machine with no personal skills dir silently skips the notes half too - the exact clean-looking empty run this check exists to prevent. Include `~/.claude/plugins` - plugin skills are part of the tier, so a section relocated into one leaves a breadcrumb that a notes-and-skills-only search cannot reach.
 
    Scope the probe to the relocated section, ending at the next heading. A note usually holds several sections and only one of them claims to be a relocation; probing the whole file reports a stale relocation on the strength of an unrelated line and points the auditor at the wrong text.
 

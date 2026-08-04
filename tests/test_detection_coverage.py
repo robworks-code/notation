@@ -44,7 +44,7 @@ def check(name, condition, detail="", info=""):
 # section size, because the cost of leaving it inline scales with it.
 # --------------------------------------------------------------------------
 
-CITES = re.compile(r"notes/[a-z0-9-]+\.md|skill `[a-z0-9-]+`")
+CITES = re.compile(r"notes/[a-z0-9-]+\.md|skill `[a-z0-9:_-]+`|skills/[a-z0-9:_-]+/")
 HEADING = re.compile(r"^#+ ")
 
 # A section that is only a trigger line plus a `Full reference: notes/x.md`
@@ -56,7 +56,7 @@ MIN_SECTION_CHARS = 600
 PREAMBLE = "(top of file, before the first heading)"
 
 
-def self_citing_sections(claude_md_text, min_chars=MIN_SECTION_CHARS):
+def self_citing_sections(claude_md_text, min_chars=MIN_SECTION_CHARS, heading_re=HEADING):
     """-> ([(chars, heading)], n_below_floor) for sections naming a destination.
 
     Breaks on EVERY heading level. Resetting only on `### ` folds each
@@ -75,7 +75,7 @@ def self_citing_sections(claude_md_text, min_chars=MIN_SECTION_CHARS):
                 below += 1
 
     for line in claude_md_text.splitlines(keepends=True):
-        if HEADING.match(line):
+        if heading_re.match(line):
             flush()
             heading, buf = line.strip(), [line]
         else:
@@ -98,7 +98,7 @@ FIXTURE_SKILL_DUP = (
 Case files: skill `verification-discipline`. It is a toolbox, not a checklist.
 
 """
-    + "".join(f"- Rule {i}: a passing check proves nothing until seen to fail.\n" for i in range(12))
+    + "".join(f"- Rule {i}: a passing check proves nothing until seen to fail.\n" for i in range(30))
     + """
 ### Sudo
 - Use sudo as needed.
@@ -107,7 +107,7 @@ Case files: skill `verification-discipline`. It is a toolbox, not a checklist.
 
 """
     + "".join(
-        f"- Rule {i}: set Status as the last step, citing the merge SHA.\n" for i in range(8)
+        f"- Rule {i}: set Status as the last step, citing the merge SHA.\n" for i in range(18)
     )
     + "\nLayout, template, and the relocation rule: `notes/plan-files.md`\n"
 )
@@ -137,6 +137,20 @@ check(
     "a following `##` section is not absorbed into the preceding `###`",
     sudo_size == 0,
     detail=f"`### Sudo` measured {sudo_size} chars - it swallowed the `##` section below it",
+)
+
+# `sudo_size == 0` is trivially true whenever `Sudo` is simply absent from the
+# results, so it only has teeth if the buggy form would put it there - i.e. if
+# the absorbed section clears the floor by a comfortable margin. Assert that
+# directly against the old `### `-only pattern, so trimming the fixture can
+# never quietly turn the regression check into a no-op that still prints ok.
+buggy, _ = self_citing_sections(FIXTURE_SKILL_DUP, heading_re=re.compile(r"^### "))
+buggy_sudo = next((c for c, h in buggy if "Sudo" in h), 0)
+check(
+    "the fixture still reproduces the bug, with margin over the floor",
+    buggy_sudo >= MIN_SECTION_CHARS + 300,
+    info=f"`### Sudo` absorbs {buggy_sudo} chars under the `### `-only form (floor {MIN_SECTION_CHARS})",
+    detail="the fixture shrank - the check above would pass even with the bug present",
 )
 
 print("\ncase: `##` sections and the preamble are their own units")
@@ -203,6 +217,19 @@ check(
     bool(CITES.search("Case files: skill `verification-discipline`.")),
     detail="skill-by-name is not matched, so procedures stay invisible",
 )
+# Plugin skills are named `plugin:skill`, which is how Claude Code refers to
+# them and how an inline section would cite one. A slug class with no `:`
+# skips exactly the sections this detector was added for.
+check(
+    "a QUALIFIED plugin skill name counts",
+    bool(CITES.search("Full procedure: skill `superpowers:brainstorming`.")),
+    detail="`plugin:skill` is unmatched, so plugin duplicates are invisible",
+)
+check(
+    "a skills/ path counts as a citation too",
+    bool(CITES.search("Steps live in ~/.claude/skills/verification-discipline/SKILL.md")),
+    detail="a section naming the file rather than the skill is the same citation",
+)
 
 
 print("\ncase: the checklist documents skills as a tier")
@@ -236,7 +263,15 @@ check(
 # to hold - a fixture where hook-length finds nothing and encoding finds plenty.
 # --------------------------------------------------------------------------
 
-LINK_FORM = re.compile(r"^- \[([a-z0-9-]+)\]\(notes/([a-z0-9-]+)\.md\)")
+# The label is `[^\]]+`, NOT a slug class. Real index labels carry capitals
+# and spaces (`- [1Password CLI](notes/1password-cli.md)`); a slug-shaped
+# pattern fails to match those lines at all, so they are counted as neither
+# compressed nor skipped and a drifted index reports a clean `skipped 0`.
+LINK_FORM = re.compile(r"^- \[([^\]]+)\]\(notes/([a-z0-9-]+)\.md\)")
+
+
+def normalise_label(label):
+    return re.sub(r"[\s_]+", "-", label.lower())
 
 
 def compress_index_line(line):
@@ -246,22 +281,35 @@ def compress_index_line(line):
     `- [claude-code](notes/claude-code-internals.md)` to `- claude-code`
     destroys the path, which is the opposite of the loss-free saving claimed.
     """
+    m = LINK_FORM.match(line)
+    if not m or normalise_label(m.group(1)) != m.group(2):
+        return line
+    return LINK_FORM.sub(f"- {m.group(2)}", line, count=1)
 
-    def sub(m):
-        return f"- {m.group(2)}" if m.group(1) == m.group(2) else m.group(0)
 
-    return LINK_FORM.sub(sub, line)
+def compress_index_section(section_lines):
+    """-> (rewritten section, current, compressed, skipped).
 
-
-def encoding_saving(index_lines):
-    """-> (current, compressed, skipped) chars for link form vs bare form."""
-    current = sum(len(l) + 1 for l in index_lines)
-    rewritten = [compress_index_line(l) for l in index_lines]
-    compressed = sum(len(l) + 1 for l in rewritten)
-    skipped = sum(
-        1 for l in index_lines for m in [LINK_FORM.match(l)] if m and m.group(1) != m.group(2)
-    )
-    return current, compressed, skipped
+    EVERY line is returned, not just the entries: blank lines, the convention
+    paragraph, and entries already in bare form pass through untouched. The
+    output is the rewritten section, so an auditor can diff it and paste it
+    back. Filtering to matching lines would make it a truncated index - a
+    deletion, in the one check whose premise is that it loses nothing. The
+    char totals cover the entries only, which is what encoding cost is.
+    """
+    rewritten, current, compressed, skipped = [], 0, 0, 0
+    for line in section_lines:
+        m = LINK_FORM.match(line)
+        if not m:
+            rewritten.append(line)
+            continue
+        new = compress_index_line(line)
+        current += len(line) + 1
+        compressed += len(new) + 1
+        if new == line:
+            skipped += 1
+        rewritten.append(new)
+    return rewritten, current, compressed, skipped
 
 
 print("\ncase: index waste that no length cap can see")
@@ -281,11 +329,25 @@ MISLABELLED = {
     23: "- [gh](notes/gh-git.md) - gh CLI and git: merges, stacked PRs, squash",
     64: "- [zsh](notes/zsh-scripting.md) - zsh script traps: cp -R, glob replace",
 }
-for i, line in MISLABELLED.items():
+# Labels with capitals and spaces: these ARE recoverable (normalise and the
+# slug falls out), so they must compress rather than be silently unmatched.
+CASED = {
+    11: "- [1Password CLI](notes/1password-cli.md) - op read for secrets, SSH agent",
+    42: "- [Gcloud](notes/gcloud.md) - gcloud CLI reference: components, accounts",
+}
+for i, line in {**MISLABELLED, **CASED}.items():
     FIXTURE_INDEX[i] = line
 
+# The section is not only entries. These must survive the rewrite untouched -
+# the convention line is the one the checklist tells you to ADD.
+FIXTURE_SECTION = (
+    ["Detailed notes live under `~/.claude/notes/` - each entry below is <name>.md there.", ""]
+    + FIXTURE_INDEX
+    + ["", "- already-bare - an entry someone compressed by hand earlier"]
+)
+
 longest = max(len(l) for l in FIXTURE_INDEX)
-current, compressed, skipped = encoding_saving(FIXTURE_INDEX)
+section_out, current, compressed, skipped = compress_index_section(FIXTURE_SECTION)
 rewritten = [compress_index_line(l) for l in FIXTURE_INDEX]
 
 check(
@@ -326,6 +388,52 @@ check(
 check(
     "and the line count is unchanged",
     len(rewritten) == len(FIXTURE_INDEX),
+)
+
+check(
+    "a label with capitals and spaces still compresses",
+    all(
+        rewritten[i].startswith(f"- {slug} -")
+        for i in CASED
+        # Read the slug off the path directly, so a label pattern that fails to
+        # match these lines reports a clean FAIL rather than crashing here.
+        for slug in [FIXTURE_INDEX[i].split("(notes/")[1].split(".md)")[0]]
+    ),
+    detail=f"left as {[rewritten[i] for i in CASED]} - a slug-shaped label pattern skips these",
+)
+check(
+    "and is NOT miscounted as skipped",
+    skipped == len(MISLABELLED),
+    info=f"skipped {skipped}",
+    detail="cased labels inflate the skip count, or vanish from both totals",
+)
+
+print("\ncase: the rewritten output is the whole section, not just the entries")
+
+check(
+    "every input line comes back, entry or not",
+    len(section_out) == len(FIXTURE_SECTION),
+    info=f"{len(FIXTURE_SECTION)} in, {len(section_out)} out",
+    detail="filtering to entries turns the scratch file into a truncated index",
+)
+check(
+    "the convention paragraph the checklist tells you to add survives",
+    any("each entry below is <name>.md there" in l for l in section_out),
+    detail="pasting the output back would delete the line that makes bare form legible",
+)
+check(
+    "an entry already in bare form survives",
+    any(l.startswith("- already-bare ") for l in section_out),
+    detail="a partially compressed index loses its compressed entries",
+)
+check(
+    "blank lines survive",
+    section_out.count("") == FIXTURE_SECTION.count(""),
+)
+check(
+    "the char totals still cover the entries only",
+    current == sum(len(l) + 1 for l in FIXTURE_INDEX),
+    detail="non-entry lines leaked into the encoding-cost measurement",
 )
 
 check(
@@ -495,8 +603,13 @@ check(
 )
 check(
     "it applies a size floor and reports what fell below it",
-    "-v min=" in checklist and "below=" not in checklist and "not shown" in checklist,
+    "-v min=" in checklist and "if(c>=min)" in checklist and "below++" in checklist,
     detail="without a floor it fires on the healthy trigger+pointer shape",
+)
+check(
+    "the below-floor count goes to stderr rather than being dropped",
+    'not shown)\\n", below, min > "/dev/stderr"' in checklist,
+    detail="a silent drop makes a healthy setup look like a failed detector",
 )
 check(
     "the breadcrumb grep is heading-anchored",
@@ -505,7 +618,7 @@ check(
 )
 check(
     "it passes directories rather than globbing SKILL.md",
-    "~/.claude/notes ~/.claude/skills 2>/dev/null" in checklist
+    "~/.claude/notes ~/.claude/skills ~/.claude/plugins 2>/dev/null" in checklist
     and not any(
         l.lstrip().startswith("grep") and "skills/*/" in l for l in checklist.splitlines()
     ),
@@ -513,13 +626,88 @@ check(
 )
 check(
     "the index compressor captures the name from the path, guarded",
-    "$1 eq $2" in checklist and "notes/([a-z0-9-]+)\\.md" in checklist,
+    "$norm eq $slug" in checklist and r"\(notes\/([a-z0-9-]+)\.md\)" in checklist,
     detail="capturing the link text destroys the path when the two differ",
 )
 check(
     "and reports skipped lines rather than silently keeping them",
     "skipped %d" in checklist,
     detail="a skip that is not counted reads as a clean compression",
+)
+check(
+    "it matches labels as [^\\]]+, not a slug class",
+    r"^- \[([^\]]+)\]" in checklist and "[\\s_]+" in checklist,
+    detail="capitalised or spaced labels are unmatched and report a false `skipped 0`",
+)
+check(
+    "it prints every line of the section, not only the entries",
+    "next unless" not in checklist and "Every line of the section is printed" in checklist,
+    detail="the scratch file becomes a truncated index and pasting it back deletes entries",
+)
+check(
+    "the citation pattern admits a qualified plugin skill name",
+    "skill `[a-z0-9:_-]+`" in checklist,
+    detail="`plugin:skill` is how Claude Code names them, and it would not match",
+)
+check(
+    "the breadcrumb search covers plugin skills",
+    "~/.claude/plugins" in checklist,
+    detail="a section relocated into a plugin skill leaves an unreachable breadcrumb",
+)
+
+
+# --------------------------------------------------------------------------
+# Contract: a skill is a destination the report format has to be able to
+# express. A tier the router can send content to, but the ledger cannot label
+# and the budget has no delta method for, is a dead end at apply time.
+# --------------------------------------------------------------------------
+
+print("\ncase: skill is a first-class destination end to end")
+
+rubric = open(os.path.join(BASE, "references", "routing-rubric.md"), encoding="utf-8").read()
+budget = open(os.path.join(BASE, "references", "size-budget.md"), encoding="utf-8").read()
+out_fmt = open(os.path.join(BASE, "references", "output-format.md"), encoding="utf-8").read()
+
+check(
+    "the rubric's skill rule is a valid ordered-list item",
+    "2b." not in rubric and "3. **Is it a PROCEDURE" in rubric,
+    detail="`2b.` is not an ordered-list marker, so it renders outside the tree",
+)
+check(
+    "the rubric states which rule wins for a tool-tied procedure",
+    "<!-- precedence-def: procedure-vs-surface -->" in rubric,
+    detail="rule 2 lists 'one CLI's auth flow' as a note; two sessions route it differently",
+)
+check(
+    "the budget has a delta method for a skill move",
+    "9. Section -> skill" in budget,
+    detail="a proposed skill move has no formula, so its row cannot be computed",
+)
+check(
+    "and says a skill costs no index line",
+    "No index line" in budget,
+    detail="tactic 1's index-line term would be applied to a destination that has none",
+)
+check(
+    "the budget no longer claims all tactics move into notes/",
+    "These seven tactics" not in budget and "These nine tactics" in budget,
+    detail="the tactic count and destination claim contradict the skill tactic",
+)
+check(
+    "the measured/estimated rule covers the new tactics",
+    "Tactics 4, 6 and 8" in budget and "1, 2, 3, 7 and 9" in budget,
+    detail="a tactic outside the enumeration has no rule for the `~` marker",
+)
+check(
+    "encoding cost and the hook cap state which one measures first",
+    "<!-- precedence-def: encoding-vs-cap -->" in budget,
+    detail="both count the same link-syntax bytes into the gated `global` bucket",
+)
+check(
+    "the report format can label a skill row",
+    "- `skill` - `~/.claude/skills/<name>/SKILL.md`" in out_fmt
+    and "has **four** values" in out_fmt,
+    detail="a skill move has no valid `file` value and folds into the notes-only ledger line",
 )
 
 
