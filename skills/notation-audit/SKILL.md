@@ -33,6 +33,7 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 
 - **Over the size budget**: `~/.claude/CLAUDE.md` above ~40,000 chars. This is the finding that sets the run's goal - everything else is scored against it. (A project `./CLAUDE.md` is scored separately and far more loosely - most never get mentioned.)
 - **CLAUDE.md bloat**: inline entries that are tool/platform/API-specific and belong in `notes/`. These are the highest-value **moves** (relocate every fact, do not trim) - they shrink the every-session prompt without losing anything.
+- **Index encoding waste**: the Topical Notes Index in markdown-link form (`- [name](notes/name.md) - hook`) spends ~34 chars per line spelling the name twice. Loss-free to strip, and invisible to any line-length test, so check it before hook length.
 - **Bloated index hooks**: Topical Notes Index lines that teach instead of route. In a mature setup the index can be a third of the whole file; capping hooks at ~100 chars is often the second-biggest lever.
 - **Orphaned index lines**: a Topical Notes Index entry whose `notes/<topic>.md` file does not exist, or a note file with no index line.
 - **Oversized notes**: a single note that has grown large enough to split by sub-topic.

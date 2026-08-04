@@ -47,6 +47,18 @@ Compare the "Topical Notes Index" section in CLAUDE.md against the actual files 
 - Note file with no index line = **unindexed note**, flag to add a one-line entry. This one **grows** CLAUDE.md - record the positive delta and offset it.
 - Index entry whose hook no longer matches the note's content = flag to refresh the description. Refresh it to a router, not a summary.
 
+**Index encoding cost (move) - check this BEFORE hook length.** Separate from how long the hooks are: measure what each line spends on *syntax* rather than on routing. The markdown link form `- [name](notes/name.md) - hook` spells the name twice and costs roughly 34 chars per line more than `- name - hook`; at 100+ notes that is thousands of characters of pure encoding, and every one of those lines can sit comfortably under any length cap while the section as a whole is a third of the file. The path is derivable from the name, so state the convention once above the index (`each entry below is <name>.md there`) and drop the link syntax.
+
+Compute the saving by transforming every line and diffing the totals, never by estimating:
+
+```sh
+grep '^- \[' ~/.claude/CLAUDE.md | perl -ne '$o += length($_);
+  s/^- \[([a-z0-9-]+)\]\(notes\/[a-z0-9-]+\.md\)/- $1/; $n += length($_);
+  END { printf "current %d, compressed %d, saved %d\n", $o, $n, $o-$n }'
+```
+
+This is loss-free, relocates nothing, and needs no destination, which makes it the first index lever to reach for. It is also a different *kind* of finding from everything else in this checklist: the rest move facts, this one removes waste, so do not skip it just because no fact is in the wrong place. Verify it by asserting every note name still appears in the rewritten index - the count of index lines must be unchanged.
+
 **Index-line compression (move).** The index routes; it does not teach. Measure the per-line spread (`awk`/`wc` the index section: median length, and how many lines exceed ~100 chars) before quoting a saving - the section total says nothing about how much of it is compressible. Flag lines well over the cap and propose shorter hooks that keep the same routing trigger; any detail worth keeping goes into the note itself, not the index. In a mature setup this is often the second-biggest lever after subsection moves.
 
 **Note consolidation (move).** Several thin sibling notes on one subject can merge into a single topic note, dropping N-1 index lines along with the duplication. Merge content, never discard it.

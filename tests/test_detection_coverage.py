@@ -130,6 +130,71 @@ check(
 )
 
 
+# --------------------------------------------------------------------------
+# Detector: index encoding cost.
+#
+# The pre-existing check measured how many index lines exceed a length cap. A
+# per-line CONSTANT is invisible to that: every line can sit under the cap while
+# the section wastes thousands of chars on link syntax. This is the regression
+# to hold - a fixture where hook-length finds nothing and encoding finds plenty.
+# --------------------------------------------------------------------------
+
+LINK_FORM = re.compile(r"^- \[([a-z0-9-]+)\]\(notes/[a-z0-9-]+\.md\)")
+
+
+def encoding_saving(index_lines):
+    """-> (current, compressed) chars for the index in link form vs bare form."""
+    current = sum(len(l) + 1 for l in index_lines)
+    compressed = sum(len(LINK_FORM.sub(r"- \1", l)) + 1 for l in index_lines)
+    return current, compressed
+
+
+print("\ncase: index waste that no length cap can see")
+
+# Every line here is comfortably under 100 chars, so the hook-length check
+# correctly reports nothing. The waste is entirely in the link syntax.
+FIXTURE_INDEX = [
+    f"- [topic-{i:03d}](notes/topic-{i:03d}.md) - short routing hook for topic {i}"
+    for i in range(100)
+]
+
+longest = max(len(l) for l in FIXTURE_INDEX)
+current, compressed = encoding_saving(FIXTURE_INDEX)
+
+check(
+    "every fixture line is under the ~100-char hook cap",
+    longest < 100,
+    info=f"longest line is {longest} chars",
+)
+check(
+    "so a length-cap check finds nothing here",
+    sum(1 for l in FIXTURE_INDEX if len(l) > 100) == 0,
+)
+check(
+    "but the encoding check finds a real saving",
+    current - compressed > 2000,
+    info=f"{current} -> {compressed}, saved {current - compressed}",
+    detail="encoding waste went undetected",
+)
+check(
+    "compression is loss-free: every note name survives",
+    all(
+        f"topic-{i:03d}" in LINK_FORM.sub(r"- \1", FIXTURE_INDEX[i]) for i in range(100)
+    ),
+    detail="a name was dropped by the rewrite",
+)
+check(
+    "and the line count is unchanged",
+    len([LINK_FORM.sub(r"- \1", l) for l in FIXTURE_INDEX]) == len(FIXTURE_INDEX),
+)
+
+check(
+    "the checklist documents encoding cost separately from hook length",
+    "Index encoding cost" in checklist and "BEFORE hook length" in checklist,
+    detail="only hook length is documented, so a link-form index reads as healthy",
+)
+
+
 print()
 if failures:
     print(f"DETECTION COVERAGE FAILED: {len(failures)} check(s)")
