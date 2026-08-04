@@ -54,4 +54,49 @@ with tempfile.TemporaryDirectory() as d:
     p3 = price.price(empty, added, os.path.join(HOME, ".claude", "CLAUDE.md"))
     check("delta is the added size", p3["delta"] == 120, info="{}".format(p3["delta"]))
 
+    print("\ncase: empty string added_path raises")
+    raised_empty = False
+    try:
+        price.price(removed, "", os.path.join(HOME, ".claude", "CLAUDE.md"))
+    except ValueError:
+        raised_empty = True
+    check(
+        "empty string added_path is refused",
+        raised_empty,
+        detail="empty string means no draft",
+    )
+
+    print("\ncase: nonexistent added_path raises")
+    raised_nonexistent = False
+    try:
+        price.price(removed, "/nonexistent/path.txt", os.path.join(HOME, ".claude", "CLAUDE.md"))
+    except ValueError:
+        raised_nonexistent = True
+    check(
+        "nonexistent added_path is refused",
+        raised_nonexistent,
+        detail="missing file means no draft",
+    )
+
+    print("\ncase: existing empty file prices as legitimate zero")
+    empty_file = os.path.join(d, "empty_draft.txt")
+    open(empty_file, "w").close()
+    p_empty = price.price(removed, empty_file, os.path.join(HOME, ".claude", "CLAUDE.md"))
+    check(
+        "existing empty file is a valid draft",
+        p_empty["delta"] == -1000,
+        detail="should be 0 - 1000, not a raise",
+        info="{}".format(p_empty["delta"]),
+    )
+
+    print("\ncase: skill bucket is not gated")
+    p_skill = price.price(removed, added, os.path.join(HOME, ".claude", "skills", "x.md"))
+    check("skill bucket exists", p_skill["bucket"] == "skill")
+    check("skill is not gated", p_skill["gated"] is False)
+
+    print("\ncase: project bucket is gated")
+    p_project = price.price(removed, added, "/some/project/CLAUDE.md")
+    check("project bucket outside home", p_project["bucket"] == "project")
+    check("project is not gated", p_project["gated"] is False)
+
 report("core-price")

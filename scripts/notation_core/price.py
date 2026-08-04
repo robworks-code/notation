@@ -8,9 +8,11 @@ from . import measure
 def _chars(path):
     if path is None:
         return None
+    if path == "":
+        return None
     full = os.path.abspath(os.path.expanduser(path))
     if not os.path.isfile(full):
-        return 0
+        return None
     return len(measure.read_text(full))
 
 
@@ -24,10 +26,22 @@ def price(removed_path, added_path, target):
     if added_path is None:
         raise ValueError(
             "price requires a drafted replacement; "
-            "a delta without one is an estimate, not a measurement"
+            "added_path is None"
         )
-    removed_chars = _chars(removed_path) or 0
-    added_chars = _chars(added_path) or 0
+    if added_path == "":
+        raise ValueError(
+            "price requires a drafted replacement; "
+            "added_path is empty"
+        )
+    added_chars = _chars(added_path)
+    if added_chars is None:
+        raise ValueError(
+            "price requires a drafted replacement; "
+            "added_path does not exist"
+        )
+    removed_chars = _chars(removed_path)
+    if removed_chars is None:
+        removed_chars = 0
     bucket = measure.resolve_bucket(target)
     return {
         "removed_chars": removed_chars,
