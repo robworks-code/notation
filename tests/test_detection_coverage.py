@@ -686,7 +686,7 @@ check(
 )
 check(
     "the audit skill defers to the core for sizes",
-    "notation-core.py measure" in checklist,
+    'notation-core.py" measure' in checklist,
     detail="audit and capture computing sizes separately is how they drift",
 )
 check(

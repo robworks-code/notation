@@ -68,10 +68,13 @@ awk '/^## .*Index/{i=1; next} /^## /{i=0} i' ~/.claude/CLAUDE.md \
 ```
 
 **Sizes come from the core, not from a count you ran by hand.** Use
-`python3 scripts/notation-core.py measure <file>` for chars, index-line count,
-and the section map, and `price --removed <f> --added <f> --target <t>` for every
-delta. The audit and the capture must produce the same number for the same file;
-two prose descriptions of the same arithmetic is exactly how they drift.
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/notation-core.py" measure <file>` for
+chars, index-line count, and the section map, and `price --removed <f> --added
+<f> --target <t>` for every delta - the same `${CLAUDE_PLUGIN_ROOT}` install
+root the command docs invoke it from, never a bare `scripts/...` path, which
+only works when the session happens to be sitting in the plugin's own
+checkout. The audit and the capture must produce the same number for the same
+file; two prose descriptions of the same arithmetic is exactly how they drift.
 
 **Every line of the section is printed, not just the entries.** Stdout is the rewritten *section* - blank lines, the convention paragraph, and entries already in bare form all pass through untouched - so redirecting it to a scratch file gives you something you can diff against the original and paste back. Filtering to matching lines would make that scratch file a truncated index, and an auditor who pasted it back would delete real entries in the one check whose premise is that it loses nothing. Verify by asserting the output has the same line count as the input section and that every note name still appears; the `current`/`compressed`/`saved` figures cover the entries only, which is what the encoding cost actually is.
 
@@ -109,8 +112,16 @@ Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CL
 1. **Sections that cite their own destination.** An inline block containing `` `notes/x.md` `` or a skill name is self-identifying: something already decided where this belongs. Rank by section size, because the cost of leaving it inline scales with it.
 
    ```sh
-   min=$(python3 -c "import sys; sys.path.insert(0, 'scripts'); \
-     from notation_core import constants; print(constants.JUSTIFY_MAX)")
+   min=$(python3 -c "
+   import sys
+   sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts')
+   from notation_core import constants
+   print(constants.JUSTIFY_MAX)
+   " 2>&1)
+   if ! printf '%s' "$min" | grep -qE '^[0-9]+$'; then
+     echo "could not read JUSTIFY_MAX from \${CLAUDE_PLUGIN_ROOT}/scripts/notation_core/constants.py: $min" >&2
+     exit 1
+   fi
    awk -v min="$min" '
      BEGIN{h="(top of file, before the first heading)"}
      function flush(){ if(h!="" && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9:_-]+`|skills\/[a-z0-9:_-]+\//)
@@ -126,6 +137,7 @@ Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CL
    - **The citation pattern must admit a qualified skill name.** Plugin skills are named `plugin:skill` - `` skill `superpowers:brainstorming` `` - which is how Claude Code refers to them and how an inline section would cite one. A `[a-z0-9-]+` class has no `:`, so exactly the sections this detector was added for go unmatched and the run looks clean. Allow `:` and `_`, and match a `skills/<name>/` path too, since a section that names the file rather than the skill is the same citation.
    - **It must break on every heading level (`^#+ `), not just `### `.** Resetting only on `###` makes each `##` heading and all its content spill into the *preceding* `###` section's buffer. On a file whose last `###` section is followed by a large `##` index, that one section absorbs the whole tail and ranks first by a wide margin - so the top-ranked proposal is to relocate the index under an unrelated heading. Everything before the first heading, and every `##` section that is not itself under a `###`, is also invisible to the `###`-only form; seed `h` in `BEGIN` so the preamble is a testable unit.
    - **`min` separates a stale duplicate from the healthy end state, and it is pulled from the core rather than typed twice.** It is set to `JUSTIFY_MAX` (`scripts/notation_core/constants.py`) - the same size above which the routing rubric already requires the material to be a note - so a section this big that also cites its own destination is definitely stale, not a judgment call. A trigger line plus a `Full reference: notes/x.md` pointer is exactly what this checklist prescribes as *correct*, and it matches the citation pattern just as well as a full inline copy does. Without a floor the detector fires on nearly every section and ranks nothing. The size *is* the signal: what you are looking for is body sitting alongside the pointer. Sections under the floor are counted to stderr rather than dropped silently - a large `below` count with an empty result means the setup is healthy, not that the detector failed.
+   - **A `min` the recipe could not read must stop the recipe, not silently become `min=""`.** `awk -v min=""` compares every section's size against an empty string, which is true for nothing, so a broken read of `constants.py` reads as "no duplicates found" - a false zero about the audit's own find-it rules, exactly the failure class this whole core exists to remove. The snippet checks `$min` is a bare integer before `awk` ever runs and exits non-zero naming the path it could not read otherwise. It also resolves that path through `${CLAUDE_PLUGIN_ROOT}`, the plugin's install root - the same variable the capture commands use - rather than a bare `scripts/...` path that only resolves when the session's cwd happens to be the plugin checkout.
 
 2. **The relocation breadcrumb.** A note or skill section headed `(relocated from CLAUDE.md ...)` whose distinctive text is STILL in CLAUDE.md is a **proven** duplicate - the relocation appended but never removed. Near-zero false positives, because the heading is a claim the move completed.
 

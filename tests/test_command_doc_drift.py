@@ -166,4 +166,41 @@ for path, text in ((NOTATE, notate_text), (NOTATE_ALL, notate_all_text)):
         PURE_ADDITION.search(text) is not None,
     )
 
+print("\ncase: the audit checklist's min= recipe cannot silently degrade to an empty threshold")
+# awk -v min="" compares every section's size against an empty string, which
+# is true for nothing - a broken read of constants.py would then read as "no
+# duplicates found" instead of "the threshold could not be read", a false
+# zero about the audit's own find-it rules. The recipe must validate the
+# value is a bare integer and exit non-zero, naming what it could not read,
+# before awk ever runs.
+CHECKLIST = os.path.join(REPO, "skills", "notation-audit", "references", "audit-checklist.md")
+checklist_text = read(CHECKLIST)
+check(
+    "the recipe validates min is numeric before running awk",
+    re.search(r"grep\s+-qE\s+'\^\[0-9\]\+\$'", checklist_text) is not None,
+    detail="an empty or non-numeric min must be caught before the awk call",
+)
+check(
+    "and exits non-zero naming what it could not read",
+    "exit 1" in checklist_text and "could not read JUSTIFY_MAX" in checklist_text,
+    detail="a silent degrade reads as a healthy 'nothing found' result",
+)
+check(
+    "the recipe resolves the core through the plugin install root, not a bare relative path",
+    "${CLAUDE_PLUGIN_ROOT}/scripts" in checklist_text
+    and "sys.path.insert(0, 'scripts')" not in checklist_text,
+    detail="a bare 'scripts/...' path only resolves when cwd is the plugin checkout",
+)
+
+print("\ncase: the plugin manifest's own description does not restate a threshold either")
+# The description is a public marketplace string, more visible than any
+# internal doc - the same drift risk applies to it.
+PLUGIN_JSON = os.path.join(REPO, ".claude-plugin", "plugin.json")
+plugin_json_text = read(PLUGIN_JSON)
+check(
+    "plugin.json has no literal threshold number",
+    not THRESHOLD.findall(plugin_json_text),
+    detail="found {}".format(THRESHOLD.findall(plugin_json_text)),
+)
+
 report("command-doc-drift")
