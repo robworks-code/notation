@@ -39,9 +39,20 @@ def price(removed_path, added_path, target):
             "price requires a drafted replacement; "
             "added_path does not exist"
         )
-    removed_chars = _chars(removed_path)
-    if removed_chars is None:
+    if removed_path is None:
         removed_chars = 0
+    elif removed_path == "":
+        raise ValueError(
+            "price requires a valid removed measurement; "
+            "removed_path is empty"
+        )
+    else:
+        removed_chars = _chars(removed_path)
+        if removed_chars is None:
+            raise ValueError(
+                "price requires a valid removed measurement; "
+                "removed_path does not exist"
+            )
     bucket = measure.resolve_bucket(target)
     return {
         "removed_chars": removed_chars,

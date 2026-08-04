@@ -99,4 +99,37 @@ with tempfile.TemporaryDirectory() as d:
     check("project bucket outside home", p_project["bucket"] == "project")
     check("project is not gated", p_project["gated"] is False)
 
+    print("\ncase: removed_path=None means nothing removed (pure addition)")
+    p_none_removed = price.price(None, added, os.path.join(HOME, ".claude", "CLAUDE.md"))
+    check(
+        "None removed_path is legitimate",
+        p_none_removed["delta"] == 120,
+        detail="nothing was removed, so delta = added size",
+        info="{}".format(p_none_removed["delta"]),
+    )
+
+    print("\ncase: empty string removed_path raises")
+    raised_empty_removed = False
+    try:
+        price.price("", added, os.path.join(HOME, ".claude", "CLAUDE.md"))
+    except ValueError:
+        raised_empty_removed = True
+    check(
+        "empty string removed_path is refused",
+        raised_empty_removed,
+        detail="empty string is not a valid path",
+    )
+
+    print("\ncase: nonexistent removed_path raises")
+    raised_nonexistent_removed = False
+    try:
+        price.price("/nonexistent/removed.txt", added, os.path.join(HOME, ".claude", "CLAUDE.md"))
+    except ValueError:
+        raised_nonexistent_removed = True
+    check(
+        "nonexistent removed_path is refused",
+        raised_nonexistent_removed,
+        detail="missing file means unknown measurement",
+    )
+
 report("core-price")
