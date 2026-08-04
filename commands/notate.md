@@ -129,19 +129,48 @@ python3 "$NOTATION/scripts/notation-core.py" open \
 
 Then, per proposal, route it, price it, and record the price into the run -
 `price` only computes the delta, `price-record` is what makes the gate able to
-see it, so a proposal that skips this step is invisible to the whole-run gate:
+see it, so a proposal that skips this step is invisible to the whole-run gate.
+
+**`--text-file`, `--removed`, and `--added` all take FILE PATHS, never inline
+text.** `route.py`/`price.py` call `os.path.isfile` on each; a raw string of
+proposal text is not a path, and will not resolve to one. Write the text you
+already drafted (Step 2's diff) to a temp file first, then pass that path:
 
 ```sh
+p_file=$(mktemp); printf '%s' "$PROPOSAL_TEXT" > "$p_file"
 python3 "$NOTATION/scripts/notation-core.py" route \
-  --text-file "$P" --target ~/.claude/CLAUDE.md
+  --text-file "$p_file" --target ~/.claude/CLAUDE.md
+```
+
+**Pricing a NEW proposal (nothing removed): omit `--removed` entirely.** It is
+optional for exactly this case - passing `""` or a path that does not exist is
+refused on purpose (a value there means a path was intended and is wrong), so
+omission is the only correct way to say "nothing removed":
+
+```sh
+added_file=$(mktemp); printf '%s' "$DRAFTED_TEXT" > "$added_file"
 python3 "$NOTATION/scripts/notation-core.py" price \
-  --removed "$REMOVED" --added "$DRAFTED" --target ~/.claude/CLAUDE.md
+  --added "$added_file" --target ~/.claude/CLAUDE.md
+```
+
+**Pricing an UPDATE or a relocation (something removed too):** write both
+slices to their own temp files and pass both paths:
+
+```sh
+removed_file=$(mktemp); printf '%s' "$REMOVED_TEXT" > "$removed_file"
+added_file=$(mktemp); printf '%s' "$DRAFTED_TEXT" > "$added_file"
+python3 "$NOTATION/scripts/notation-core.py" price \
+  --removed "$removed_file" --added "$added_file" --target ~/.claude/CLAUDE.md
+```
+
+Then record the price into the run - `$DELTA` and `$BUCKET` are `price`'s own
+`delta` and `bucket` fields, read back out of the JSON it just printed, not
+recomputed:
+
+```sh
 python3 "$NOTATION/scripts/notation-core.py" price-record \
   --run-id "$RUN" --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
 ```
-
-`$DELTA` and `$BUCKET` are `price`'s own `delta` and `bucket` fields, read back
-out of the JSON it just printed - not recomputed.
 
 Act on the `band` the core returns; the thresholds live in the core and are
 deliberately not restated here:

@@ -77,7 +77,7 @@ for path, text in ((NOTATE, notate_text), (NOTATE_ALL, notate_all_text)):
 
 print("\ncase: gate's required flag is documented")
 gate_parser = parser._subparsers._group_actions[0].choices["gate"]
-gate_flags = {a.option_strings[0] for a in gate_parser._actions if a.option_strings}
+gate_flags = {a.option_strings[0] for a in gate_parser._actions if a.option_strings} - {"-h"}
 for flag in gate_flags:
     check(
         "gate's {} is shown in notate.md".format(flag),
@@ -120,6 +120,50 @@ for band_name in ("inline", "justify", "must_note"):
     check(
         "'{}' band is named in a command doc".format(band_name),
         "`{}`".format(band_name) in both,
+    )
+
+print("\ncase: price's actual flags are named in both docs' price invocations")
+# route/price/price take FILE PATHS (os.path.isfile in the core), and --removed
+# is optional there - a session that reads only the flag names, not the
+# surrounding prose, must still see the real flag set. Read the flags off the
+# live argparse definition rather than a hand-kept list, so a flag rename is
+# caught here too.
+price_parser = parser._subparsers._group_actions[0].choices["price"]
+price_flags = {a.option_strings[0] for a in price_parser._actions
+               if a.option_strings} - {"-h"}
+for path, text in ((NOTATE, notate_text), (NOTATE_ALL, notate_all_text)):
+    for flag in price_flags:
+        check(
+            "{}'s price invocation shows {}".format(os.path.basename(path), flag),
+            flag in text,
+        )
+
+print("\ncase: both docs state that route/price take file paths, not inline text")
+# This is the defect a live reviewer hit: --removed/--added take paths
+# (os.path.isfile), but nothing near them said so, so the natural reading -
+# Step 2 calls this a 'diff' - was to pass literal text and get a ValueError.
+for path, text in ((NOTATE, notate_text), (NOTATE_ALL, notate_all_text)):
+    check(
+        "{} states --text-file/--removed/--added take file paths".format(
+            os.path.basename(path)),
+        "FILE PATHS" in text,
+    )
+    check(
+        "{} shows how to produce those paths (mktemp)".format(os.path.basename(path)),
+        "mktemp" in text,
+    )
+
+print("\ncase: both docs show the pure-addition form (--removed omitted)")
+# price's --removed is optional specifically so a NEW proposal - the common
+# case - has a legal invocation. A doc that only ever shows --removed being
+# passed leaves that path undiscoverable.
+PURE_ADDITION = re.compile(
+    r'notation-core\.py"\s+price\s+\\\s*\n\s+--added\b'
+)
+for path, text in ((NOTATE, notate_text), (NOTATE_ALL, notate_all_text)):
+    check(
+        "{} shows a price call with --removed omitted".format(os.path.basename(path)),
+        PURE_ADDITION.search(text) is not None,
     )
 
 report("command-doc-drift")

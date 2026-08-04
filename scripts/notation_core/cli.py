@@ -43,7 +43,13 @@ def _parser():
     r.add_argument("--notes-dir", default="~/.claude/notes")
 
     pr = sub.add_parser("price")
-    pr.add_argument("--removed", required=True)
+    # --removed is OPTIONAL: a pure addition removes nothing, and price()
+    # treats removed_path=None as exactly that (0 removed chars) - a
+    # legitimate case, not a missing argument. Omitting the flag is how a
+    # caller says "nothing removed"; passing an empty string or a path that
+    # does not exist means a path WAS intended and is wrong, and both must
+    # keep refusing (see price.py) so the two cases are never conflated.
+    pr.add_argument("--removed", default=None)
     pr.add_argument("--added", required=True)
     pr.add_argument("--target", required=True)
 

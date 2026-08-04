@@ -145,6 +145,40 @@ with tempfile.TemporaryDirectory() as d:
         rec_ok = False
     check("price-record stdout parses as JSON", rec_ok, detail=repr(out_rec[:120]))
 
+    print("\ncase: --removed on the price CLI - omitted vs empty vs nonexistent stay distinguishable")
+    # Omitted: a pure addition. argparse must not require this flag, or a
+    # session with nothing to remove has no value it can pass.
+    rc_omit, out_omit, err_omit = run(
+        ["price", "--added", added_file, "--target", target], env)
+    check("omitted --removed exits 0 (pure addition is legitimate)",
+          rc_omit == 0, info="rc={}".format(rc_omit), detail=err_omit.strip())
+    try:
+        omit_delta = json.loads(out_omit)["delta"]
+        omit_ok = omit_delta == json.loads(out_price)["added_chars"]
+    except ValueError:
+        omit_ok = False
+    check("omitted --removed prices as added_chars alone (removed=0)", omit_ok,
+          detail=repr(out_omit[:160]))
+
+    # Empty string: a path WAS intended and is wrong. Must still refuse.
+    rc_empty, out_empty, err_empty = run(
+        ["price", "--removed", "", "--added", added_file, "--target", target], env)
+    check("empty-string --removed exits 2 (still refused)", rc_empty == 2,
+          info="rc={}".format(rc_empty))
+    check("empty-string --removed produces no stdout JSON", out_empty.strip() == "")
+    check("empty-string --removed explains on stderr", "removed_path is empty" in err_empty,
+          detail=repr(err_empty[:160]))
+
+    # Nonexistent path: also a path that was intended and is wrong.
+    rc_missing, out_missing, err_missing = run(
+        ["price", "--removed", "/nonexistent/removed-cli.txt",
+         "--added", added_file, "--target", target], env)
+    check("nonexistent --removed exits 2 (still refused)", rc_missing == 2,
+          info="rc={}".format(rc_missing))
+    check("nonexistent --removed produces no stdout JSON", out_missing.strip() == "")
+    check("nonexistent --removed explains on stderr",
+          "removed_path does not exist" in err_missing, detail=repr(err_missing[:160]))
+
     rc_close, out_close, _ = run(["close", "--run-id", "r3"], env)
     check("close exits 0 when reconciled", rc_close == 0, info="rc={}".format(rc_close))
     try:

@@ -20,21 +20,46 @@ price, and record each proposal - the identical core, the identical commands,
 just with nothing standing between the verdict and the write. `$NOTATION` is
 `${CLAUDE_PLUGIN_ROOT}`, this plugin's install root.
 
+**`--text-file`, `--removed`, and `--added` all take FILE PATHS, never inline
+text** - `route.py`/`price.py` call `os.path.isfile` on each. Write each slice
+to a temp file first:
+
 ```sh
 python3 "$NOTATION/scripts/notation-core.py" open \
   --target ~/.claude/CLAUDE.md --run-id "$RUN" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+p_file=$(mktemp); printf '%s' "$PROPOSAL_TEXT" > "$p_file"
 python3 "$NOTATION/scripts/notation-core.py" route \
-  --text-file "$P" --target ~/.claude/CLAUDE.md
+  --text-file "$p_file" --target ~/.claude/CLAUDE.md
+
+added_file=$(mktemp); printf '%s' "$DRAFTED_TEXT" > "$added_file"
 python3 "$NOTATION/scripts/notation-core.py" price \
-  --removed "$REMOVED" --added "$DRAFTED" --target ~/.claude/CLAUDE.md
+  --added "$added_file" --target ~/.claude/CLAUDE.md
+```
+
+That `price` call is the pure-addition form - `--removed` omitted, because
+this proposal is a NEW entry and nothing is being removed. **`--removed` is
+optional for exactly this reason:** an explicit `""` or a nonexistent path is
+still refused (a value there means a path was intended and is wrong), so
+omitting the flag is the only correct way to price a pure addition. When the
+proposal is an UPDATE or relocation that removes an existing slice, write that
+slice to its own temp file too and pass both:
+
+```sh
+removed_file=$(mktemp); printf '%s' "$REMOVED_TEXT" > "$removed_file"
+python3 "$NOTATION/scripts/notation-core.py" price \
+  --removed "$removed_file" --added "$added_file" --target ~/.claude/CLAUDE.md
+```
+
+Then record whichever price into the run - `$DELTA` and `$BUCKET` come back
+out of `price`'s own JSON, not recomputed. `price` alone never touches the
+ledger, so skipping `price-record` leaves the proposal invisible to `gate`
+below, which is the one check standing in for the picker here:
+
+```sh
 python3 "$NOTATION/scripts/notation-core.py" price-record \
   --run-id "$RUN" --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
 ```
-
-`$DELTA` and `$BUCKET` come back out of `price`'s own JSON - `price` alone
-never touches the ledger, so skipping `price-record` leaves the proposal
-invisible to `gate` below, which is the one check standing in for the picker
-here.
 
 Act on the `band` the core returns exactly as `commands/notate.md` Step 2.5 describes
 (`inline` / `justify` / `must_note`), then immediately before the writes below,
