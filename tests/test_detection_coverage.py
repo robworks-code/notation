@@ -195,6 +195,108 @@ check(
 )
 
 
+# --------------------------------------------------------------------------
+# Detector: the relocation breadcrumb.
+#
+# A note section headed "(relocated from CLAUDE.md)" is a CLAIM that the move
+# completed. If the moved text is still in CLAUDE.md, the append succeeded and
+# the removal did not - a proven duplicate, not a suspected one.
+# --------------------------------------------------------------------------
+
+BREADCRUMB = re.compile(r"^#+ .*relocated from CLAUDE\.md", re.MULTILINE)
+
+
+def stale_relocations(claude_md_text, note_texts):
+    """-> [(note, probe)] where a relocated section's text is still inline."""
+    stale = []
+    for name, body in note_texts.items():
+        if not BREADCRUMB.search(body):
+            continue
+        for line in body.splitlines():
+            line = line.strip()
+            # A distinctive line: long enough not to collide by accident.
+            if len(line) > 40 and not line.startswith("#") and line in claude_md_text:
+                stale.append((name, line))
+                break
+    return stale
+
+
+print("\ncase: a relocation that appended but never removed")
+
+CLAUDE_WITH_LEFTOVER = """# CLAUDE.md
+
+### PATH clobbering
+The clobber is inherited by every child process, so a test shelling out fails.
+
+### Something else
+Nothing relocated about this one.
+"""
+
+NOTES = {
+    # Claims the move happened; its text is still inline above.
+    "macos-platform.md": """# macOS platform
+
+## The PATH clobber (relocated from CLAUDE.md 2026-08-04)
+The clobber is inherited by every child process, so a test shelling out fails.
+""",
+    # A healthy note: relocated, and the source really was cleaned.
+    "zsh-scripting.md": """# zsh scripting
+
+## Glob traps (relocated from CLAUDE.md 2026-07-30)
+An unquoted glob matching no file aborts the whole command chain in zsh.
+""",
+    # No breadcrumb at all - must not be probed.
+    "railway.md": """# Railway
+
+## Auth
+The clobber is inherited by every child process, so a test shelling out fails.
+""",
+}
+
+stale = stale_relocations(CLAUDE_WITH_LEFTOVER, NOTES)
+names = [n for n, _ in stale]
+
+check(
+    "flags the note whose relocated text is still inline",
+    "macos-platform.md" in names,
+    detail=f"flagged {names}",
+)
+check(
+    "does not flag a relocation that really was removed",
+    "zsh-scripting.md" not in names,
+    detail="false positive on a healthy relocation",
+)
+check(
+    "does not probe a note with no relocation breadcrumb",
+    "railway.md" not in names,
+    info="even though its text also appears inline",
+    detail="probing every note produces noise and false duplicates",
+)
+
+
+# --------------------------------------------------------------------------
+# Divergence: two tiers, same subject, incompatible claims.
+# --------------------------------------------------------------------------
+
+print("\ncase: divergence outranks duplication")
+
+check(
+    "check 5 tells the auditor to look for contradictions, not just copies",
+    "Divergence is worse than duplication" in checklist,
+    detail="only duplication is modelled, so a contradiction survives the audit",
+)
+check(
+    "and rules that the newer dated measurement wins",
+    "always outranks an undated assertion" in checklist,
+    detail="no tie-break, so the auditor must guess which copy is right",
+)
+check(
+    "the checklist prescribes mechanical detectors, not eyeballing",
+    "Do not eyeball this" in checklist and "relocated from CLAUDE.md" in checklist,
+    detail="check 5 stays a search nobody performs",
+)
+
+
 print()
 if failures:
     print(f"DETECTION COVERAGE FAILED: {len(failures)} check(s)")

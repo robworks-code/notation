@@ -38,7 +38,8 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 - **Orphaned index lines**: a Topical Notes Index entry whose `notes/<topic>.md` file does not exist, or a note file with no index line.
 - **Oversized notes**: a single note that has grown large enough to split by sub-topic.
 - **Memory without a pointer**: a frontmatter memory file with no matching line in `MEMORY.md` (or a `MEMORY.md` line pointing at a missing file).
-- **Cross-tier duplication**: the same fact living in two tiers - keep the more specific copy, drop the redundant one.
+- **Cross-tier duplication**: the same fact living in two tiers - keep the more specific copy, drop the redundant one. Find it mechanically (self-citing sections, the `relocated from CLAUDE.md` breadcrumb), never by eyeballing; see `references/audit-checklist.md` check 5.
+- **Cross-tier divergence**: two tiers making *incompatible* claims about one subject. More dangerous than duplication - duplication wastes context, contradiction produces wrong actions. The newer dated measurement wins; correct the loser rather than deleting it.
 - **Missing recency dates**: new-style notes entries or memory files lacking a date; nudge new additions toward `(YYYY-MM-DD)` / `metadata.updated`.
 - **Backup clutter**: stale `~/.claude/CLAUDE.md.bak.*` snapshots the user may want to prune (keep the most recent one or two - they are the preservation safety net).
 - **Scope leakage**: a global `notes/` file whose subject is really one repo, or a project memory file holding a fact that is true everywhere. Both directions leak; see `references/audit-checklist.md` check 9.

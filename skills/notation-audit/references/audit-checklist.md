@@ -82,6 +82,25 @@ For the current project's memory dir (`~/.claude/projects/<encoded-cwd>/memory/`
 
 Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CLAUDE.md and in a note). **Skills count as a tier here** - an inline section duplicating `~/.claude/skills/<name>/SKILL.md` is the same defect and is usually the largest instance of it, because procedures are long. Recommend keeping the more specific home (usually the note) and removing the **redundant copy** - this is the one safe deletion, because the fact survives in the other tier. Before flagging, confirm the two entries are genuinely the same fact and that the surviving copy is at least as complete; if the CLAUDE.md copy has detail the note lacks, merge that detail INTO the note first, then drop the inline copy. Never delete both, and never delete the only copy of a fact.
 
+**Do not eyeball this - two mechanical detectors find nearly all of it.** "Spot facts that appear in more than one tier" over a 40,000-char file against 100+ notes and every installed skill is a search nobody actually performs, which is why this check reports nothing on setups that are full of duplication. Run both:
+
+1. **Sections that cite their own destination.** An inline block containing `` `notes/x.md` `` or a skill name is self-identifying: something already decided where this belongs. Rank by section size, because the cost of leaving it inline scales with it.
+
+   ```sh
+   awk '/^### /{if(h && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9-]+`/) print c"\t"h; h=$0; c=0; buf=""}
+        {c+=length($0)+1; buf=buf"\n"$0}
+        END{if(h && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9-]+`/) print c"\t"h}' ~/.claude/CLAUDE.md | sort -rn
+   ```
+
+2. **The relocation breadcrumb.** A note or skill section headed `(relocated from CLAUDE.md ...)` whose distinctive text is STILL in CLAUDE.md is a **proven** duplicate - the relocation appended but never removed. Near-zero false positives, because the heading is a claim the move completed.
+
+   ```sh
+   grep -l "relocated from CLAUDE.md" ~/.claude/notes/*.md ~/.claude/skills/*/SKILL.md
+   # then probe a distinctive line from each such section against ~/.claude/CLAUDE.md
+   ```
+
+**Divergence is worse than duplication, and this check must look for it too.** Two tiers describing the same subject with *incompatible* claims is not wasted context, it is a wrong action waiting to happen - and the newer, more specific measurement is usually the one buried in the note. When the two copies disagree, do not silently keep either: name both, say which is newer and what evidence dates it, and correct the loser in place rather than deleting it. `/notation:notate` Step 2 already does this for local vs checked-in files; the same rule applies between CLAUDE.md and a note. A dated correction ("measured 2026-08-02: did not reproduce") always outranks an undated assertion.
+
 **Compare across scopes too, not just across global tiers.** A fact can sit in project memory *and* in a global note. Keep the copy whose scope matches the fact - if it stops being true in another repo, project memory is the survivor and the global note's copy is the redundant one, not the reverse. Removing the global copy is the safe deletion here because the fact survives in project memory; removing the project copy would leave a repo-bound fact loaded in every session.
 
 ## 6. Missing recency dates (tidy)
