@@ -1,6 +1,15 @@
 """Run-scoped ledger. The gate needs whole-run state; this holds it.
 
 NOTATION_RUNS_DIR overrides the location so tests never touch the real one.
+
+All three ledger-loading refusals are catchable as RunLedgerError:
+- RunLedgerMissingError: run id was never opened (file does not exist)
+- RunLedgerJSONError: file exists but is not valid JSON
+- RunLedgerInvalidError: JSON is valid but not a valid ledger structure
+
+RunLedgerMissingError inherits from both RunLedgerError and LookupError, so
+existing code catching LookupError continues to work while also allowing
+unified handling of all three refusals via the RunLedgerError base.
 """
 
 import hashlib
@@ -11,7 +20,17 @@ from . import measure
 
 
 class RunLedgerError(Exception):
-    """Base exception for ledger-format errors (JSON or structure)."""
+    """Base exception for all ledger-loading refusals."""
+    pass
+
+
+class RunLedgerMissingError(RunLedgerError, LookupError):
+    """Run id was never opened (file does not exist).
+
+    Inherits from both RunLedgerError and LookupError for backward
+    compatibility: existing `except LookupError` handlers still work,
+    and all three refusals are now catchable via `except RunLedgerError`.
+    """
     pass
 
 
@@ -76,14 +95,17 @@ def open_run(targets, run_id, now):
 def load(run_id):
     """-> the ledger.
 
-    Raises three distinct errors:
-    - LookupError if run id was never opened (file does not exist)
+    Raises one of three RunLedgerError subtypes:
+    - RunLedgerMissingError if run id was never opened (file does not exist)
+      (also catchable as LookupError for backward compatibility)
     - RunLedgerJSONError if file is not valid JSON
     - RunLedgerInvalidError if JSON is valid but not a valid ledger structure
+
+    All three are catchable via `except RunLedgerError`.
     """
     p = _path(run_id)
     if not os.path.isfile(p):
-        raise LookupError(
+        raise RunLedgerMissingError(
             "no ledger for run '{}' at {}; refusing to guess".format(run_id, p)
         )
     try:

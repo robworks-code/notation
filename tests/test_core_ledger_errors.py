@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory() as d:
         ledger.load("never-opened")
     except Exception as e:
         caught = type(e).__name__
-    check("raises LookupError", caught == "LookupError", detail=f"got {caught}")
+    check("raises RunLedgerMissingError", caught == "RunLedgerMissingError", detail=f"got {caught}")
 
     try:
         ledger.load("never-opened")
@@ -74,13 +74,37 @@ with tempfile.TemporaryDirectory() as d:
         check("add_proposal raises RunLedgerInvalidError", True)
 
     print("\ndistinguishability: the three are catchable and distinct")
-    check("LookupError is not a RunLedgerError",
-          not issubclass(LookupError, ledger.RunLedgerError))
+    check("RunLedgerMissingError is a RunLedgerError",
+          issubclass(ledger.RunLedgerMissingError, ledger.RunLedgerError))
+    check("RunLedgerMissingError is a LookupError (backward compat)",
+          issubclass(ledger.RunLedgerMissingError, LookupError))
     check("RunLedgerJSONError is a RunLedgerError",
           issubclass(ledger.RunLedgerJSONError, ledger.RunLedgerError))
     check("RunLedgerInvalidError is a RunLedgerError",
           issubclass(ledger.RunLedgerInvalidError, ledger.RunLedgerError))
-    check("RunLedgerJSONError is not RunLedgerInvalidError",
-          ledger.RunLedgerJSONError != ledger.RunLedgerInvalidError)
+    check("All three are distinct from each other",
+          len({ledger.RunLedgerMissingError, ledger.RunLedgerJSONError, ledger.RunLedgerInvalidError}) == 3)
+
+    print("\nunified catchability: all three can be caught as RunLedgerError")
+    missing_caught = False
+    try:
+        ledger.load("never-opened")
+    except ledger.RunLedgerError:
+        missing_caught = True
+    check("never-opened caught as RunLedgerError", missing_caught)
+
+    json_caught = False
+    try:
+        ledger.load("bad-json")
+    except ledger.RunLedgerError:
+        json_caught = True
+    check("invalid JSON caught as RunLedgerError", json_caught)
+
+    struct_caught = False
+    try:
+        ledger.load("bad-struct")
+    except ledger.RunLedgerError:
+        struct_caught = True
+    check("invalid structure caught as RunLedgerError", struct_caught)
 
 report("core-ledger-errors")
