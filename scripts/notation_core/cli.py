@@ -33,9 +33,16 @@ def _parser():
     m.add_argument("path")
 
     o = sub.add_parser("open")
+    # --target is repeatable and every file the run will touch belongs here:
+    # close() reconciles registered targets and nothing else, so an
+    # unregistered file is one whose failed write reports as success.
     o.add_argument("--target", action="append", required=True)
     o.add_argument("--run-id", required=True)
     o.add_argument("--now", required=True)
+
+    reg = sub.add_parser("register")
+    reg.add_argument("--run-id", required=True)
+    reg.add_argument("--target", action="append", required=True)
 
     r = sub.add_parser("route")
     r.add_argument("--text-file", required=True)
@@ -140,9 +147,27 @@ def main(argv):
             _emit(ledger.open_run(args.target, args.run_id, args.now))
             return EXIT_OK
 
+        if args.cmd == "register":
+            _emit({
+                "run_id": args.run_id,
+                "registered": [ledger.register_target(args.run_id, t)
+                               for t in args.target],
+            })
+            return EXIT_OK
+
         if args.cmd == "route":
             text = measure.read_text(args.text_file)
-            _emit(route.route(text, args.target, args.notes_dir))
+            verdict = route.route(text, args.target, args.notes_dir)
+            _emit(verdict)
+            # An unreadable note is counted in notes_searched but can never
+            # match, so it has to be said out loud or it reads as a miss.
+            for item in verdict["unreadable"]:
+                sys.stderr.write(
+                    "note could not be read, so it was ranked on its filename "
+                    "alone and cannot match on content: {} ({})\n".format(
+                        item["path"], item["error"]
+                    )
+                )
             return EXIT_OK
 
         if args.cmd == "price":
@@ -173,6 +198,14 @@ def main(argv):
             _emit(report)
             for finding in report["findings"]:
                 sys.stderr.write(finding + "\n")
+            # Not a finding (it is the ordinary outcome for a file the run
+            # wrote to), but it must never pass for a clean bill of health.
+            for path in report["drift_undetermined"]:
+                sys.stderr.write(
+                    "{}: outside edits could NOT be ruled out - a size and a "
+                    "pre-run hash cannot separate this run's own write from "
+                    "someone else's\n".format(path)
+                )
             return EXIT_OK if report["reconciled"] else EXIT_REFUSED
 
     except Exception as exc:                       # noqa: BLE001 - intentional
