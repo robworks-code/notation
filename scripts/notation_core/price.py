@@ -10,7 +10,7 @@ def _chars(path):
         return None
     if path == "":
         return None
-    full = os.path.abspath(os.path.expanduser(path))
+    full = measure.norm_path(path)
     if not os.path.isfile(full):
         return None
     return len(measure.read_text(full))
@@ -59,5 +59,8 @@ def price(removed_path, added_path, target):
         "added_chars": added_chars,
         "delta": added_chars - removed_chars,
         "bucket": bucket,
+        # The canonical spelling of the target, so a caller can hand the same
+        # key to price-record instead of re-typing a path that may differ.
+        "target": measure.norm_path(target),
         "gated": measure.is_gated(bucket),
     }
