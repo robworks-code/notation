@@ -203,4 +203,15 @@ check(
     detail="found {}".format(THRESHOLD.findall(plugin_json_text)),
 )
 
+print("\ncase: README.md does not restate a threshold either")
+# README is the most-read file in the repo - if a band ever changes, a
+# restated number here is the single most likely place left lying to a user.
+README = os.path.join(REPO, "README.md")
+readme_text = read(README)
+check(
+    "README.md has no literal threshold number",
+    not THRESHOLD.findall(readme_text),
+    detail="found {}".format(THRESHOLD.findall(readme_text)),
+)
+
 report("command-doc-drift")
