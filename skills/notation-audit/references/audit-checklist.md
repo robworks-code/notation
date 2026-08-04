@@ -33,6 +33,7 @@ Read `~/.claude/CLAUDE.md`. For each inline entry or subsection, ask the routing
 - A whole subsection about a single service is a strong signal: it should usually be a note with a one-line index entry instead.
 - A multi-line inline entry that survives the routing question can still shed its detail: keep the **trigger** inline as one line and move the commands, error strings, and recipe into a note (`size-budget.md` tactic 2).
 - Prefer appending to an existing note over creating a new one - a new note also costs a new index line.
+- **If the material is a procedure rather than a fact** (ordered steps, a workflow, a decision tree), the destination is a **skill**, not a note - keep the trigger inline, move the body to `~/.claude/skills/<name>/SKILL.md`. A skill costs no index line, so this is cheaper than a new note. Check the skill directories before proposing a new one; the procedure is often already extracted and the inline copy is simply a leftover (see check 5).
 - **Report the win in characters, not vibes**: each finding's delta is the measured byte count of the lines leaving CLAUDE.md, minus the **drafted** replacement (the pointer line, the index line). Draft the replacement at report time - it is one line, and it is the substance of the proposal anyway - so both halves of the number are real. Per-tactic methods: `size-budget.md` > "Every row's delta needs a method".
 - The fix is **relocation, not deletion** - the bytes leave CLAUDE.md but land intact in the note. Do not propose dropping detail on the way.
 
@@ -45,6 +46,34 @@ Compare the "Topical Notes Index" section in CLAUDE.md against the actual files 
 - Index line -> file that does not exist = **orphaned link**, flag to fix (remove the line or restore the file).
 - Note file with no index line = **unindexed note**, flag to add a one-line entry. This one **grows** CLAUDE.md - record the positive delta and offset it.
 - Index entry whose hook no longer matches the note's content = flag to refresh the description. Refresh it to a router, not a summary.
+
+**Index encoding cost (move) - check this BEFORE hook length.** Separate from how long the hooks are: measure what each line spends on *syntax* rather than on routing. The markdown link form `- [name](notes/name.md) - hook` spells the name twice and costs roughly 34 chars per line more than `- name - hook`; at 100+ notes that is thousands of characters of pure encoding, and every one of those lines can sit comfortably under any length cap while the section as a whole is a third of the file. The path is derivable from the name, so state the convention once above the index (`each entry below is <name>.md there`) and drop the link syntax.
+
+Compute the saving by transforming every line and diffing the totals, never by estimating. Scope it to the index section - a markdown-link bullet anywhere else in the file would inflate the "current" total - capture the name from the **path**, not the link text, and write the rewritten index out so there is something to verify against:
+
+```sh
+awk '/^## .*Index/{i=1; next} /^## /{i=0} i' ~/.claude/CLAUDE.md \
+  | perl -ne 'BEGIN{$o=$n=$c=$skip=0}
+      if (/^- \[([^\]]+)\]\(notes\/([a-z0-9-]+)\.md\)/) {
+        my ($label, $slug) = ($1, $2);
+        (my $norm = lc $label) =~ s/[\s_]+/-/g;
+        $c++; $o += length($_);
+        if ($norm eq $slug) { s/^- \[[^\]]+\]\(notes\/[a-z0-9-]+\.md\)/- $slug/ }
+        else { $skip++ }
+        $n += length($_);
+      }
+      print;
+      END { printf STDERR "entries %d, current %d, compressed %d, saved %d, skipped %d\n",
+                          $c, $o, $n, $o-$n, $skip }'
+```
+
+**Every line of the section is printed, not just the entries.** Stdout is the rewritten *section* - blank lines, the convention paragraph, and entries already in bare form all pass through untouched - so redirecting it to a scratch file gives you something you can diff against the original and paste back. Filtering to matching lines would make that scratch file a truncated index, and an auditor who pasted it back would delete real entries in the one check whose premise is that it loses nothing. Verify by asserting the output has the same line count as the input section and that every note name still appears; the `current`/`compressed`/`saved` figures cover the entries only, which is what the encoding cost actually is.
+
+The `$norm eq $slug` guard is load-bearing. Link text and filename are independent, so `- [claude-code](notes/claude-code-internals.md) - ...` would compress to `- claude-code - ...` and the path would no longer be derivable from the name - a silent loss, not a saving. Those lines are left in link form and counted as `skipped`; either rename the note to match its label or leave them. A `skipped` count above zero is a finding in its own right: the index labels and the filenames have drifted apart.
+
+**Match the label as `[^\]]+`, not `[a-z0-9-]+`.** Real index labels carry capitals and spaces - `- [1Password CLI](notes/1password-cli.md)`, `- [Gcloud](notes/gcloud.md)`. A slug-shaped label pattern does not match those lines at all, so they are silently counted as neither compressed nor skipped, and a genuinely drifted index reports `skipped 0` and reads as clean. Normalising the label (lowercase, whitespace and underscores to hyphens) before the comparison both recovers those lines as compressible and leaves `skipped` meaning what the paragraph above says it means.
+
+`saved 0` with `entries 0` means the index is already bare (or the heading regex missed it) - report "nothing to do", not a saving. When the same run also reports hook-length compression below, measure this one first and compute that one against the compressed lines - both otherwise claim the same link-syntax bytes into the gated `global` bucket (`size-budget.md` > "When two rules conflict"). <!-- precedence-ref: encoding-vs-cap --> This is loss-free, relocates nothing, and needs no destination, which makes it the first index lever to reach for. It is also a different *kind* of finding from everything else in this checklist: the rest move facts, this one removes waste, so do not skip it just because no fact is in the wrong place.
 
 **Index-line compression (move).** The index routes; it does not teach. Measure the per-line spread (`awk`/`wc` the index section: median length, and how many lines exceed ~100 chars) before quoting a saving - the section total says nothing about how much of it is compressible. Flag lines well over the cap and propose shorter hooks that keep the same routing trigger; any detail worth keeping goes into the note itself, not the index. In a mature setup this is often the second-biggest lever after subsection moves.
 
@@ -67,7 +96,43 @@ For the current project's memory dir (`~/.claude/projects/<encoded-cwd>/memory/`
 
 ## 5. Cross-tier duplication (move)
 
-Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CLAUDE.md and in a note). Recommend keeping the more specific home (usually the note) and removing the **redundant copy** - this is the one safe deletion, because the fact survives in the other tier. Before flagging, confirm the two entries are genuinely the same fact and that the surviving copy is at least as complete; if the CLAUDE.md copy has detail the note lacks, merge that detail INTO the note first, then drop the inline copy. Never delete both, and never delete the only copy of a fact.
+Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CLAUDE.md and in a note). **Skills count as a tier here** - an inline section duplicating `~/.claude/skills/<name>/SKILL.md` is the same defect and is usually the largest instance of it, because procedures are long. Recommend keeping the more specific home (usually the note) and removing the **redundant copy** - this is the one safe deletion, because the fact survives in the other tier. Before flagging, confirm the two entries are genuinely the same fact and that the surviving copy is at least as complete; if the CLAUDE.md copy has detail the note lacks, merge that detail INTO the note first, then drop the inline copy. Never delete both, and never delete the only copy of a fact.
+
+**Do not eyeball this - two mechanical detectors find nearly all of it.** "Spot facts that appear in more than one tier" over a 40,000-char file against 100+ notes and every installed skill is a search nobody actually performs, which is why this check reports nothing on setups that are full of duplication. Run both:
+
+1. **Sections that cite their own destination.** An inline block containing `` `notes/x.md` `` or a skill name is self-identifying: something already decided where this belongs. Rank by section size, because the cost of leaving it inline scales with it.
+
+   ```sh
+   awk -v min=600 '
+     BEGIN{h="(top of file, before the first heading)"}
+     function flush(){ if(h!="" && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9:_-]+`|skills\/[a-z0-9:_-]+\//)
+                       { if(c>=min) print c"\t"h; else below++ } }
+     /^#+ /{ flush(); h=$0; c=0; buf="" }
+     { c+=length($0)+1; buf=buf"\n"$0 }
+     END{ flush(); if(below) printf "(%d citing section(s) below min=%d, not shown)\n", below, min > "/dev/stderr" }
+   ' ~/.claude/CLAUDE.md | sort -rn
+   ```
+
+   Three details decide whether this reports anything real:
+
+   - **The citation pattern must admit a qualified skill name.** Plugin skills are named `plugin:skill` - `` skill `superpowers:brainstorming` `` - which is how Claude Code refers to them and how an inline section would cite one. A `[a-z0-9-]+` class has no `:`, so exactly the sections this detector was added for go unmatched and the run looks clean. Allow `:` and `_`, and match a `skills/<name>/` path too, since a section that names the file rather than the skill is the same citation.
+   - **It must break on every heading level (`^#+ `), not just `### `.** Resetting only on `###` makes each `##` heading and all its content spill into the *preceding* `###` section's buffer. On a file whose last `###` section is followed by a large `##` index, that one section absorbs the whole tail and ranks first by a wide margin - so the top-ranked proposal is to relocate the index under an unrelated heading. Everything before the first heading, and every `##` section that is not itself under a `###`, is also invisible to the `###`-only form; seed `h` in `BEGIN` so the preamble is a testable unit.
+   - **`min` separates a stale duplicate from the healthy end state.** A trigger line plus a `Full reference: notes/x.md` pointer is exactly what this checklist prescribes as *correct*, and it matches the citation pattern just as well as a full inline copy does. Without a floor the detector fires on nearly every section and ranks nothing. The size *is* the signal: what you are looking for is body sitting alongside the pointer. Sections under the floor are counted to stderr rather than dropped silently - a large `below` count with an empty result means the setup is healthy, not that the detector failed.
+
+2. **The relocation breadcrumb.** A note or skill section headed `(relocated from CLAUDE.md ...)` whose distinctive text is STILL in CLAUDE.md is a **proven** duplicate - the relocation appended but never removed. Near-zero false positives, because the heading is a claim the move completed.
+
+   ```sh
+   grep -rlE '^#+ .*relocated from CLAUDE\.md' \
+        ~/.claude/notes ~/.claude/skills ~/.claude/plugins 2>/dev/null
+   # then, for EACH breadcrumbed section, probe a distinctive line
+   # from THAT section (not from elsewhere in the note) against ~/.claude/CLAUDE.md
+   ```
+
+   Anchor the pattern to a heading. Unanchored, it also matches prose that merely *discusses* relocation, and a note that documents this checklist matches itself. Pass directories to `grep -r` rather than globbing `~/.claude/skills/*/SKILL.md`: under zsh an unmatched glob aborts the whole command before `grep` runs, so a machine with no personal skills dir silently skips the notes half too - the exact clean-looking empty run this check exists to prevent. Include `~/.claude/plugins` - plugin skills are part of the tier, so a section relocated into one leaves a breadcrumb that a notes-and-skills-only search cannot reach.
+
+   Scope the probe to the relocated section, ending at the next heading. A note usually holds several sections and only one of them claims to be a relocation; probing the whole file reports a stale relocation on the strength of an unrelated line and points the auditor at the wrong text.
+
+**Divergence is worse than duplication, and this check must look for it too.** Two tiers describing the same subject with *incompatible* claims is not wasted context, it is a wrong action waiting to happen - and the newer, more specific measurement is usually the one buried in the note. When the two copies disagree, do not silently keep either: name both, say which is newer and what evidence dates it, and correct the loser in place rather than deleting it. `/notation:notate` Step 2 already does this for local vs checked-in files; the same rule applies between CLAUDE.md and a note. A dated correction ("measured 2026-08-02: did not reproduce") always outranks an undated assertion.
 
 **Compare across scopes too, not just across global tiers.** A fact can sit in project memory *and* in a global note. Keep the copy whose scope matches the fact - if it stops being true in another repo, project memory is the survivor and the global note's copy is the redundant one, not the reverse. Removing the global copy is the safe deletion here because the fact survives in project memory; removing the project copy would leave a repo-bound fact loaded in every session.
 

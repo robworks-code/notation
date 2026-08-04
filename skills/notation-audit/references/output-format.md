@@ -79,7 +79,7 @@ Audit columns: `#`, `title`, `severity`, `problem`, `delta`.
 drafted with a trailing `~` (`-3,610~`), so an estimated figure is never read as a measured one.
 
 **Deltas never pool across files of different scope.** A row's delta is a different currency
-depending on which file it lands on, so the `file` column has **three** values - only the first
+depending on which file it lands on, so the `file` column has **four** values - only the first
 sums to the global ledger's net figure and feeds the pre-apply no-growth gate:
 
 - `global` - the row touches `~/.claude/CLAUDE.md` itself (an inline rule, a Topical Notes Index
@@ -89,13 +89,18 @@ sums to the global ledger's net figure and feeds the pre-apply no-growth gate:
   feeds the gate. A check 9 note shrink is this value. If the row *also* removes the note's index
   line, it touches `~/.claude/CLAUDE.md` too - split it into a `notes` row and a `global` row, or
   label it `global` and count only the index-line bytes there.
+- `skill` - `~/.claude/skills/<name>/SKILL.md`. Like `notes`, global in scope and never gated. It
+  is a **separate** value rather than a flavour of `notes` for two reasons: a skill costs no
+  Topical Notes Index line, so the split-the-row rule above does not apply to it, and the
+  `~/.claude/notes/:` ledger line is documented as notes-only. Folding a skill move into `notes`
+  reports index-line arithmetic that never happened. Tactic 9 rows carry this value.
 - `project` - `./CLAUDE.md`, `./.claude/docs/`, or a project memory file. Not gated (unless strict
   mode, which gives the project file its own separate `<= 0` check).
 
 **The `file` column.** Add it to any table with a row that is not `global`, and total each group
 separately in the ledger. A table whose rows are **all** `global` omits the `file` column; a table
-holding even one `notes` or `project` row carries it, including a table whose rows are *all* `notes`
-(a check-9 note shrink) or all `project`. Labelling a `notes` row `global` would report a reduction
+holding even one `notes`, `skill` or `project` row carries it, including a table whose rows are
+*all* `notes` (a check-9 note shrink), all `skill`, or all `project`. Labelling a `notes` row `global` would report a reduction
 of the every-session file that never happened - the exact failure the ledger exists to prevent, and
 dropping the column so the reader assumes `global` does the same thing.
 
@@ -105,7 +110,8 @@ and every note row that also adds a Topical Notes Index line. Delta is a whole-c
 never per-row: once a table has the column, every row in it shows a number, and rows with no
 CLAUDE.md effect show `0`. A capture table where no row touches **either CLAUDE.md** omits the
 `delta` column entirely. Across the whole report the `global` rows' deltas sum to the global
-ledger's net figure; `notes` and `project` rows total on their own lines and never feed the gate.
+ledger's net figure; `notes`, `skill` and `project` rows total on their own lines and never feed
+the gate.
 
 Capture example (GLOBAL RULES always carries delta; TOPICAL NOTES carries it here because row 2
 creates a note and therefore an index line, while row 3 appends to a note that is already indexed):

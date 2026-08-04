@@ -73,6 +73,9 @@ python3 tests/test_backup_lifecycle.py || bad "backup-lifecycle tests"
 step "preservation-procedure mutation tests"
 python3 tests/test_preservation_probe.py || bad "preservation mutation tests"
 
+step "detection-coverage tests"
+python3 tests/test_detection_coverage.py || bad "detection-coverage tests"
+
 printf '\n'
 if [ "$fail" -ne 0 ]; then
   printf 'VERIFY FAILED\n'

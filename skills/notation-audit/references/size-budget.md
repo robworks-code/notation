@@ -175,10 +175,10 @@ than quietly stopping.
 Every tactic below is lossless at the fact level - the information survives, it just stops being
 loaded every session.
 
-**These seven tactics are for `~/.claude/CLAUDE.md` only.** They all move content into
-`~/.claude/notes/` and the Topical Notes Index, which are global - applying them to a project file
-would leak one repo's specifics into every other session. For a project file, use the project-file
-tactics at the end of this section instead.
+**These nine tactics are for `~/.claude/CLAUDE.md` only.** All but tactic 9 move content into
+`~/.claude/notes/` and the Topical Notes Index; tactic 9 moves it into a skill. Both destinations
+are global - applying either to a project file would leak one repo's specifics into every other
+session. For a project file, use the project-file tactics at the end of this section instead.
 
 1. **Subsection -> note.** A whole `##`/`###` subsection about one tool, platform, API, SDK, or
    service moves verbatim into `~/.claude/notes/<topic>.md`, replaced by one index line. Biggest
@@ -197,12 +197,26 @@ tactics at the end of this section instead.
    inline-only detail INTO the note before dropping the inline copy.
 5. **Index-line compression.** Index hooks route, they do not teach. Cap each at ~100 chars: enough
    to know when to open the note, no more. In a mature setup the index can be a third or more of the
-   whole file, so this is often the second-biggest lever after subsection moves.
+   whole file, so this is often the second-biggest lever after subsection moves. Compute it against
+   the lines tactic 8 has already compressed, never against the raw ones.
+   <!-- precedence-ref: encoding-vs-cap -->
 6. **Note consolidation.** Several thin sibling notes on one subject merge into a single topic note,
    removing N-1 index lines along with the duplication.
 7. **Prose -> one line.** Collapse a paragraph into the `` `pattern` - note `` inline format, but
    **only** when every distinct fact survives; if the paragraph holds two facts, it becomes two
    lines or moves to a note. Never summarize away a fact to save bytes.
+8. **Index encoding cost.** Drop the markdown-link syntax from the Topical Notes Index -
+   `- [name](notes/name.md) - hook` becomes `- name - hook`, with the convention stated once above
+   the index. Removes waste rather than moving a fact, so it needs no destination and is the first
+   index lever to reach for. Do not run it in the same report as tactic 5 without excluding the
+   overlap - see "When two rules conflict".
+   <!-- precedence-ref: encoding-vs-cap -->
+9. **Section -> skill.** An inline section that is a *procedure* - ordered steps where skipping one
+   breaks the outcome - moves into `~/.claude/skills/<name>/SKILL.md`, leaving the trigger inline.
+   Unlike tactic 1 it costs **no index line**, because skills are discovered by their own frontmatter
+   rather than through the Topical Notes Index, which makes it the cheapest large move available.
+   Routing is `routing-rubric.md` rule 3; the procedure-vs-tool-surface tie-break lives there.
+   <!-- precedence-ref: procedure-vs-surface -->
 
 Do NOT reach for: deleting still-true rules, dropping the genuinely global sections (permissions,
 gh/git, shell/PATH, session/harness, workflow, accessibility), or condensing two facts into one.
@@ -231,6 +245,20 @@ Mint the new note and offset its index line elsewhere in the same run. ~110 char
 outranks whether the fact can be found again. Real case: the no-fancy-dashes *rationale*
 appended to `notes/unicode-bulk-edit.md`, a note about perl mechanics - correct on cost,
 unfindable for anyone searching why em-dashes are banned.
+
+<!-- precedence-def: encoding-vs-cap -->
+**Tactic 8 is measured first and tactic 5 gets the remainder.** Both act on the same index lines
+and both count the same bytes: tactic 5's method is `-(sum of current lengths of the over-cap
+lines) + (cap x count)`, and "current length" includes the ~34 chars of link syntax tactic 8
+claims on its own. A line like `- [very-long-name](notes/very-long-name.md) - <120-char hook>`
+appears in both rows, so a report carrying both over-states the saving - and the `global` bucket
+feeds the no-growth gate and the projected-size line, which makes that an inflated promise, not a
+rounding error. Run tactic 8 first, because it is exact and needs no destination, then compute
+tactic 5 **against the compressed lines**: `-(sum of compressed lengths of the still-over-cap
+lines) + (cap x count)`. Compressing usually pulls some lines back under the cap on its own, so
+tactic 5's count shrinks too. If you report only one of them, say which - a tactic 5 figure taken
+from uncompressed lines is an estimate that leans high, and `output-format.md` requires that to
+be marked.
 
 <!-- precedence-def: split-vs-budget -->
 **The budget beats splitting an oversized note.** Check 3 flags a large note for splitting by
@@ -287,6 +315,8 @@ rest**, per tactic:
 | 5. Index-line compression | Measure the per-line spread, then `delta = -(sum of current lengths of the over-cap lines) + (cap x count)`. |
 | 6. Note consolidation | `-(measured bytes of the N-1 index lines being dropped)`. Exact. |
 | 7. Prose -> one line | Draft the replacement line, then `-(measured) + (drafted)`. Never quote this one without drafting. |
+| 8. Index encoding cost | Run the transform and diff the totals (`audit-checklist.md` check 2): `delta = -(saved)`. Exact and measured by construction - the compressor counts both sides, so never estimate it. If tactic 5 also appears in the report, subtract the overlap first. |
+| 9. Section -> skill | `-(measured bytes of the lines leaving) + (drafted inline trigger line)`. **No index line**, in either direction: a skill is not indexed, so tactic 1's third term does not apply. The row's `file` label is `skill`, and the SKILL.md bytes total on their own ledger line, never in `global`. |
 
 The pattern is the same throughout: **the thing being removed is always measurable, so measure it;
 the thing replacing it is always short, so draft it.** A delta quoted without doing both is a guess.
@@ -301,10 +331,11 @@ sed -n '412,468p' ~/.claude/CLAUDE.md | wc -c
 ### Mark which rows are measured
 
 A row is **measured** only when *both* halves are real: the removed bytes were counted with a
-command, and the replacement line was drafted. Tactics 4 and 6 have no replacement, so they are
-always measured. Tactics 1, 2, 3 and 7 are measured once you draft. A row is **estimated** when the
-replacement length is assumed rather than drafted - tactic 5's cap is the standard case. Mark the
-estimated ones - see `output-format.md` > Zone 2 - so a reader knows which figures to trust.
+command, and the replacement line was drafted. Tactics 4, 6 and 8 have no replacement, so they are
+always measured - tactic 8 counts both sides itself. Tactics 1, 2, 3, 7 and 9 are measured once you
+draft. A row is **estimated** when the replacement length is assumed rather than drafted - tactic
+5's cap is the standard case. Mark the estimated ones - see `output-format.md` > Zone 2 - so a
+reader knows which figures to trust.
 
 Note the direction each estimate errs in, and do not describe them as if they all lean one way:
 **tactic 5 is pessimistic** (the cap is a ceiling, so a real compression usually saves a little more

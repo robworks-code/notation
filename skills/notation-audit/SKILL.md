@@ -13,6 +13,7 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 - **Topical notes** - `~/.claude/notes/*.md`: situational, loaded on demand, each registered by a line in the "Topical Notes Index" at the bottom of CLAUDE.md.
 - **Project memory** - `~/.claude/projects/<encoded-cwd>/memory/`: one fact per frontmatter file, indexed by `MEMORY.md`.
 - **Project docs / CLAUDE.md** - `./.claude/docs/`, `./CLAUDE.md`: project-tracked guides and team conventions.
+- **Skills** - `~/.claude/skills/<name>/SKILL.md` and plugin skills: procedural how-to, loaded on demand by name. A skill is BOTH a valid relocation destination and a duplication counterparty. Do not treat it as out of scope because this plugin ships as one: an inline CLAUDE.md section that names a skill is the highest-confidence move in the file, and check 5 must compare against skills the same way it compares against notes.
 
 ## How to run an audit
 
@@ -32,11 +33,13 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 
 - **Over the size budget**: `~/.claude/CLAUDE.md` above ~40,000 chars. This is the finding that sets the run's goal - everything else is scored against it. (A project `./CLAUDE.md` is scored separately and far more loosely - most never get mentioned.)
 - **CLAUDE.md bloat**: inline entries that are tool/platform/API-specific and belong in `notes/`. These are the highest-value **moves** (relocate every fact, do not trim) - they shrink the every-session prompt without losing anything.
+- **Index encoding waste**: the Topical Notes Index in markdown-link form (`- [name](notes/name.md) - hook`) spends ~34 chars per line spelling the name twice. Loss-free to strip, and invisible to any line-length test, so check it before hook length.
 - **Bloated index hooks**: Topical Notes Index lines that teach instead of route. In a mature setup the index can be a third of the whole file; capping hooks at ~100 chars is often the second-biggest lever.
 - **Orphaned index lines**: a Topical Notes Index entry whose `notes/<topic>.md` file does not exist, or a note file with no index line.
 - **Oversized notes**: a single note that has grown large enough to split by sub-topic.
 - **Memory without a pointer**: a frontmatter memory file with no matching line in `MEMORY.md` (or a `MEMORY.md` line pointing at a missing file).
-- **Cross-tier duplication**: the same fact living in two tiers - keep the more specific copy, drop the redundant one.
+- **Cross-tier duplication**: the same fact living in two tiers - keep the more specific copy, drop the redundant one. Find it mechanically (self-citing sections, the `relocated from CLAUDE.md` breadcrumb), never by eyeballing; see `references/audit-checklist.md` check 5.
+- **Cross-tier divergence**: two tiers making *incompatible* claims about one subject. More dangerous than duplication - duplication wastes context, contradiction produces wrong actions. The newer dated measurement wins; correct the loser rather than deleting it.
 - **Missing recency dates**: new-style notes entries or memory files lacking a date; nudge new additions toward `(YYYY-MM-DD)` / `metadata.updated`.
 - **Backup clutter**: stale `~/.claude/CLAUDE.md.bak.*` snapshots the user may want to prune (keep the most recent one or two - they are the preservation safety net).
 - **Scope leakage**: a global `notes/` file whose subject is really one repo, or a project memory file holding a fact that is true everywhere. Both directions leak; see `references/audit-checklist.md` check 9.
