@@ -6,8 +6,13 @@ repo's own `./CLAUDE.md`**. Never apply one's rules to the other.
 
 | File | Loads | Budget | Enforcement |
 | --- | --- | --- | --- |
-| `~/.claude/CLAUDE.md` | every prompt of **every** session, in every repo | 40,000 chars | **Strict** - net delta `<= 0` always, reduce until under target |
+| `~/.claude/CLAUDE.md` | every prompt of **every** session, in every repo | `GLOBAL_TARGET_CHARS` | **Strict** - net delta `<= 0` always, reduce until under target |
 | `./CLAUDE.md` | only in the one repo it belongs to | soft, see below | **Advisory** by default; strict on request or recorded preference |
+
+Both target sizes are named constants in `scripts/notation_core/constants.py` -
+`GLOBAL_TARGET_CHARS`, `PROJECT_SILENT_CHARS`, `PROJECT_ADVISORY_CHARS` - stated
+here once. A change to any of them is one edit there; this file states the rule,
+the core is what runs it.
 
 The asymmetry is the point. A line in the global file is paid for in every session you ever run. A
 line in a project CLAUDE.md is paid for only while you are working in that repo, and is usually
@@ -22,13 +27,14 @@ finding was correct.
 ## The global budget (`~/.claude/CLAUDE.md`)
 
 Claude Code warns when a single loaded memory file exceeds **roughly 5% of the model's context
-window in characters, with a floor of ~40,000 chars** (`getMaxMemoryCharacterCount`). The floor is
-the portable number - a file that fits under it fits on every model.
+window in characters, with a floor matching `GLOBAL_TARGET_CHARS`** (`getMaxMemoryCharacterCount`).
+The floor is the portable number - a file that fits under it fits on every model.
 
-- **Hard ceiling:** `max(40000, 5% of the context window)` chars - above this the harness warns.
-- **Target:** **<= 40,000 chars**, and comfortably under it if the file is already close, so
-  ordinary growth from `/notation:notate` does not immediately trip the ceiling.
-- **Green band:** <= 32,000 chars (80% of the floor). A file in the green band only needs the
+- **Hard ceiling:** `max(GLOBAL_TARGET_CHARS, 5% of the context window)` chars - above this the
+  harness warns.
+- **Target:** **<= `GLOBAL_TARGET_CHARS`**, and comfortably under it if the file is already close,
+  so ordinary growth from `/notation:notate` does not immediately trip the ceiling.
+- **Green band:** <= 80% of `GLOBAL_TARGET_CHARS`. A file in the green band only needs the
   no-growth rule below, not an active reduction pass.
 
 Measure, never estimate:
@@ -42,7 +48,7 @@ awk '/^## Topical Notes Index/,0' ~/.claude/CLAUDE.md | wc -c   # how much is in
 
 1. **No-growth rule (always).** The net character delta of an audit's applied changes must be
    `<= 0`. This binds even when the file is already under budget.
-2. **Reduction rule (when over the target).** If the file is over 40,000 chars, the audit must
+2. **Reduction rule (when over the target).** If the file is over `GLOBAL_TARGET_CHARS`, the audit must
    propose enough relocation to land under it - or, if that is not achievable without losing value,
    say so explicitly and report the best achievable size plus what is blocking the rest.
 
@@ -59,13 +65,15 @@ is no no-growth rule and no reduction rule by default.
 
 Three bands, measured with `wc -c ./CLAUDE.md`:
 
-- **Under 20,000 chars - silent.** Normal and healthy. Do not report a size, do not propose a
-  trim, do not mention it. Most project files live here forever.
-- **20,000 to 40,000 - one advisory line, no findings.** Report the number in the ledger and move
-  on: `./CLAUDE.md: 24,180 chars (soft cap 40,000) - fine, no action`. Do not manufacture move
-  findings. Growing into this band is expected for a large or long-lived codebase.
-- **Over 40,000 - a real finding, severity `move`.** This is the harness's own per-file warning
-  threshold, so the file now costs a warning and a meaningful slice of every session in that repo.
+- **Under `PROJECT_SILENT_CHARS` - silent.** Normal and healthy. Do not report a size, do not
+  propose a trim, do not mention it. Most project files live here forever.
+- **`PROJECT_SILENT_CHARS` to `PROJECT_ADVISORY_CHARS` - one advisory line, no findings.** Report
+  the number in the ledger and move on: `./CLAUDE.md: 24,180 chars (soft cap: PROJECT_ADVISORY_CHARS)
+  - fine, no action`. Do not manufacture move findings. Growing into this band is expected for a
+  large or long-lived codebase.
+- **Over `PROJECT_ADVISORY_CHARS` - a real finding, severity `move`.** This is the harness's own
+  per-file warning threshold, so the file now costs a warning and a meaningful slice of every
+  session in that repo.
   Propose relocation into **project-local homes** (below) using the project-file tactics in
   "Reduction tactics", and report a projected size. It is still advisory: the user may decline and
   the audit accepts that without re-raising it.
@@ -97,12 +105,13 @@ Enforce the global file's rules (net delta `<= 0`, reduce until under target) on
 
 When strict mode is on, say so in the scorecard so it is never ambiguous which rules produced the
 findings, and name which trigger fired: `strict (requested)` for #1, `strict (project memory)` for
-#2. A target the user names beats the 40,000 default.
+#2. A target the user names beats the `PROJECT_ADVISORY_CHARS` default.
 
 **Strict mode overrides the three bands, including the silent one.** A strict run always prints the
-project ledger line and always scores the file, even under 20,000 chars - the whole point of asking
-for strict is to see the number. Under strict, the file's own target is the named one (or 40,000),
-the net delta must be `<= 0`, and findings are real rather than advisory. Relocation still goes to
+project ledger line and always scores the file, even under `PROJECT_SILENT_CHARS` - the whole point
+of asking for strict is to see the number. Under strict, the file's own target is the named one (or
+`PROJECT_ADVISORY_CHARS`), the net delta must be `<= 0`, and findings are real rather than advisory.
+Relocation still goes to
 project-local homes only; strict changes the *enforcement*, never the *destination*.
 
 ## Additive findings must be offset (global file)
@@ -134,7 +143,7 @@ which file each delta is against (see `output-format.md` > Zone 2) so a note or 
 never be read as a global reduction.
 
 ```
-~/.claude/CLAUDE.md: 59,482 chars (over the 40,000 target by 19,482)
+~/.claude/CLAUDE.md: 59,482 chars (over the GLOBAL_TARGET_CHARS target by 19,482)
 Proposed:            -21,310 chars -> 38,172 projected (under target)
 ```
 
@@ -155,11 +164,11 @@ project memory:      +2,980 chars (project scope, not gated)
 ```
 
 Add a project line **only when the current project has its own `./CLAUDE.md`**, and only when it is
-at 20,000 chars or more - below that it stays silent, unless strict mode is on (a strict run always
-prints the line, at any size):
+at `PROJECT_SILENT_CHARS` or more - below that it stays silent, unless strict mode is on (a strict
+run always prints the line, at any size):
 
 ```
-./CLAUDE.md:         24,180 chars (soft cap 40,000) - fine, no action
+./CLAUDE.md:         24,180 chars (soft cap: PROJECT_ADVISORY_CHARS) - fine, no action
 ```
 
 Never sum these lines into one figure. `global`, `notes` and `project` are separate budgets with
@@ -317,6 +326,10 @@ rest**, per tactic:
 | 7. Prose -> one line | Draft the replacement line, then `-(measured) + (drafted)`. Never quote this one without drafting. |
 | 8. Index encoding cost | Run the transform and diff the totals (`audit-checklist.md` check 2): `delta = -(saved)`. Exact and measured by construction - the compressor counts both sides, so never estimate it. If tactic 5 also appears in the report, subtract the overlap first. |
 | 9. Section -> skill | `-(measured bytes of the lines leaving) + (drafted inline trigger line)`. **No index line**, in either direction: a skill is not indexed, so tactic 1's third term does not apply. The row's `file` label is `skill`, and the SKILL.md bytes total on their own ledger line, never in `global`. |
+
+**Every method above is implemented by `scripts/notation-core.py price`.** The
+table states the intent; the core is what runs. If a row's arithmetic and the
+core disagree, the core is authoritative and the row is a bug - fix the row.
 
 The pattern is the same throughout: **the thing being removed is always measurable, so measure it;
 the thing replacing it is always short, so draft it.** A delta quoted without doing both is a guess.

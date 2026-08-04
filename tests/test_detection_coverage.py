@@ -23,6 +23,9 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = os.path.join(REPO, "skills", "notation-audit")
 CHECKLIST = os.path.join(BASE, "references", "audit-checklist.md")
+SIZE_BUDGET = os.path.join(BASE, "references", "size-budget.md")
+ROUTING_RUBRIC = os.path.join(BASE, "references", "routing-rubric.md")
+OUTPUT_FORMAT = os.path.join(BASE, "references", "output-format.md")
 
 failures = []
 
@@ -653,6 +656,48 @@ check(
     "the breadcrumb search covers plugin skills",
     "~/.claude/plugins" in checklist,
     detail="a section relocated into a plugin skill leaves an unreachable breadcrumb",
+)
+
+core_constants = open(
+    os.path.join(REPO, "scripts", "notation_core", "constants.py"), encoding="utf-8"
+).read()
+notate = open(os.path.join(REPO, "commands", "notate.md"), encoding="utf-8").read()
+notate_all = open(os.path.join(REPO, "commands", "notate-all.md"), encoding="utf-8").read()
+
+check(
+    "thresholds are defined in the core",
+    "INLINE_MAX = 200" in core_constants and "JUSTIFY_MAX = 600" in core_constants,
+    detail="the single source of the routing bands is missing",
+)
+check(
+    "and the command docs do not restate them",
+    not re.search(r"\b(200|600|40,?000|20,?000)\b", notate + notate_all),
+    detail="a threshold change would leave the command docs disagreeing with the gate",
+)
+check(
+    "the capture commands run the gate before writing",
+    'notation-core.py" gate' in notate and 'notation-core.py" gate' in notate_all,
+    detail="a capture that never gates is the state this core exists to replace",
+)
+check(
+    "notate-all says the gate is not optional",
+    "The gate is not optional here" in notate_all,
+    detail="it applies everything with no picker, so nothing else catches a bad run",
+)
+check(
+    "the audit skill defers to the core for sizes",
+    "notation-core.py measure" in checklist,
+    detail="audit and capture computing sizes separately is how they drift",
+)
+check(
+    "and the audit reference docs do not restate the thresholds either",
+    not re.search(
+        r"\b(200|600|40,?000|20,?000)\b",
+        checklist + open(SIZE_BUDGET, encoding="utf-8").read()
+        + open(ROUTING_RUBRIC, encoding="utf-8").read()
+        + open(OUTPUT_FORMAT, encoding="utf-8").read(),
+    ),
+    detail="a band change would leave the audit skill's own docs disagreeing with the gate",
 )
 
 

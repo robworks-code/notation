@@ -18,7 +18,7 @@ awk '/^## Topical Notes Index/,0' ~/.claude/CLAUDE.md | wc -c   # how much is in
 wc -c ./CLAUDE.md 2>/dev/null                                   # project file, if the repo has one
 ```
 
-Compare the global file against the target in `size-budget.md` (<= 40,000 chars; green band <= 32,000).
+Compare the global file against the target in `size-budget.md` (the core's global target, `GLOBAL_TARGET_CHARS` in `scripts/notation_core/constants.py`; green band <= 80% of it).
 
 - **Over target** -> the run's goal is a projected size under it. Keep working checks 1, 2 and 5 (the reduction levers) until the ledger gets there, or until nothing is left that can move without losing value - then say what is blocking the rest.
 - **In the green band** -> no reduction pass needed; just hold the net delta at `<= 0`.
@@ -67,6 +67,12 @@ awk '/^## .*Index/{i=1; next} /^## /{i=0} i' ~/.claude/CLAUDE.md \
                           $c, $o, $n, $o-$n, $skip }'
 ```
 
+**Sizes come from the core, not from a count you ran by hand.** Use
+`python3 scripts/notation-core.py measure <file>` for chars, index-line count,
+and the section map, and `price --removed <f> --added <f> --target <t>` for every
+delta. The audit and the capture must produce the same number for the same file;
+two prose descriptions of the same arithmetic is exactly how they drift.
+
 **Every line of the section is printed, not just the entries.** Stdout is the rewritten *section* - blank lines, the convention paragraph, and entries already in bare form all pass through untouched - so redirecting it to a scratch file gives you something you can diff against the original and paste back. Filtering to matching lines would make that scratch file a truncated index, and an auditor who pasted it back would delete real entries in the one check whose premise is that it loses nothing. Verify by asserting the output has the same line count as the input section and that every note name still appears; the `current`/`compressed`/`saved` figures cover the entries only, which is what the encoding cost actually is.
 
 The `$norm eq $slug` guard is load-bearing. Link text and filename are independent, so `- [claude-code](notes/claude-code-internals.md) - ...` would compress to `- claude-code - ...` and the path would no longer be derivable from the name - a silent loss, not a saving. Those lines are left in link form and counted as `skipped`; either rename the note to match its label or leave them. A `skipped` count above zero is a finding in its own right: the index labels and the filenames have drifted apart.
@@ -98,12 +104,14 @@ For the current project's memory dir (`~/.claude/projects/<encoded-cwd>/memory/`
 
 Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CLAUDE.md and in a note). **Skills count as a tier here** - an inline section duplicating `~/.claude/skills/<name>/SKILL.md` is the same defect and is usually the largest instance of it, because procedures are long. Recommend keeping the more specific home (usually the note) and removing the **redundant copy** - this is the one safe deletion, because the fact survives in the other tier. Before flagging, confirm the two entries are genuinely the same fact and that the surviving copy is at least as complete; if the CLAUDE.md copy has detail the note lacks, merge that detail INTO the note first, then drop the inline copy. Never delete both, and never delete the only copy of a fact.
 
-**Do not eyeball this - two mechanical detectors find nearly all of it.** "Spot facts that appear in more than one tier" over a 40,000-char file against 100+ notes and every installed skill is a search nobody actually performs, which is why this check reports nothing on setups that are full of duplication. Run both:
+**Do not eyeball this - two mechanical detectors find nearly all of it.** "Spot facts that appear in more than one tier" over a file at the global target size against 100+ notes and every installed skill is a search nobody actually performs, which is why this check reports nothing on setups that are full of duplication. Run both:
 
 1. **Sections that cite their own destination.** An inline block containing `` `notes/x.md` `` or a skill name is self-identifying: something already decided where this belongs. Rank by section size, because the cost of leaving it inline scales with it.
 
    ```sh
-   awk -v min=600 '
+   min=$(python3 -c "import sys; sys.path.insert(0, 'scripts'); \
+     from notation_core import constants; print(constants.JUSTIFY_MAX)")
+   awk -v min="$min" '
      BEGIN{h="(top of file, before the first heading)"}
      function flush(){ if(h!="" && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9:_-]+`|skills\/[a-z0-9:_-]+\//)
                        { if(c>=min) print c"\t"h; else below++ } }
@@ -117,7 +125,7 @@ Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CL
 
    - **The citation pattern must admit a qualified skill name.** Plugin skills are named `plugin:skill` - `` skill `superpowers:brainstorming` `` - which is how Claude Code refers to them and how an inline section would cite one. A `[a-z0-9-]+` class has no `:`, so exactly the sections this detector was added for go unmatched and the run looks clean. Allow `:` and `_`, and match a `skills/<name>/` path too, since a section that names the file rather than the skill is the same citation.
    - **It must break on every heading level (`^#+ `), not just `### `.** Resetting only on `###` makes each `##` heading and all its content spill into the *preceding* `###` section's buffer. On a file whose last `###` section is followed by a large `##` index, that one section absorbs the whole tail and ranks first by a wide margin - so the top-ranked proposal is to relocate the index under an unrelated heading. Everything before the first heading, and every `##` section that is not itself under a `###`, is also invisible to the `###`-only form; seed `h` in `BEGIN` so the preamble is a testable unit.
-   - **`min` separates a stale duplicate from the healthy end state.** A trigger line plus a `Full reference: notes/x.md` pointer is exactly what this checklist prescribes as *correct*, and it matches the citation pattern just as well as a full inline copy does. Without a floor the detector fires on nearly every section and ranks nothing. The size *is* the signal: what you are looking for is body sitting alongside the pointer. Sections under the floor are counted to stderr rather than dropped silently - a large `below` count with an empty result means the setup is healthy, not that the detector failed.
+   - **`min` separates a stale duplicate from the healthy end state, and it is pulled from the core rather than typed twice.** It is set to `JUSTIFY_MAX` (`scripts/notation_core/constants.py`) - the same size above which the routing rubric already requires the material to be a note - so a section this big that also cites its own destination is definitely stale, not a judgment call. A trigger line plus a `Full reference: notes/x.md` pointer is exactly what this checklist prescribes as *correct*, and it matches the citation pattern just as well as a full inline copy does. Without a floor the detector fires on nearly every section and ranks nothing. The size *is* the signal: what you are looking for is body sitting alongside the pointer. Sections under the floor are counted to stderr rather than dropped silently - a large `below` count with an empty result means the setup is healthy, not that the detector failed.
 
 2. **The relocation breadcrumb.** A note or skill section headed `(relocated from CLAUDE.md ...)` whose distinctive text is STILL in CLAUDE.md is a **proven** duplicate - the relocation appended but never removed. Near-zero false positives, because the heading is a claim the move completed.
 
@@ -258,15 +266,17 @@ Only if `./CLAUDE.md` **exists** in the current repo. Test for the file, not for
 
 The three bands below are the **advisory** (default) procedure. Strict mode replaces them - see the end of this check.
 
-- **Under 20,000 chars** -> **silent**. Do not report a size, do not propose a trim, do not mention it at all. This is the normal state and is not a finding.
-- **20,000 to 40,000** -> **one advisory ledger line, zero findings**: `./CLAUDE.md: 24,180 chars (soft cap 40,000) - fine, no action`. Do not manufacture moves. A large or long-lived codebase legitimately lives here.
-- **Over 40,000** -> a real **move** finding. Propose relocation into project-local homes (`./.claude/docs/<name>.md` first, then the repo's real docs, then project memory) - **never into `~/.claude/notes/`**, which is global and would leak this repo's specifics into every other one. Leave a one-line pointer behind. Report a projected size.
+- **Under `PROJECT_SILENT_CHARS`** -> **silent**. Do not report a size, do not propose a trim, do not mention it at all. This is the normal state and is not a finding.
+- **`PROJECT_SILENT_CHARS` to `PROJECT_ADVISORY_CHARS`** -> **one advisory ledger line, zero findings**: `./CLAUDE.md: 24,180 chars (soft cap: PROJECT_ADVISORY_CHARS) - fine, no action`. Do not manufacture moves. A large or long-lived codebase legitimately lives here.
+- **Over `PROJECT_ADVISORY_CHARS`** -> a real **move** finding. Propose relocation into project-local homes (`./.claude/docs/<name>.md` first, then the repo's real docs, then project memory) - **never into `~/.claude/notes/`**, which is global and would leak this repo's specifics into every other one. Leave a one-line pointer behind. Report a projected size.
 
-Even over 40,000 this stays **advisory**: the user may decline, and the audit accepts that without re-raising it in the same run. There is no no-growth rule for a project file - a run that grows `./CLAUDE.md` is not a failed run.
+(`PROJECT_SILENT_CHARS` and `PROJECT_ADVISORY_CHARS` are named constants in `scripts/notation_core/constants.py`; see `size-budget.md` for the values.)
+
+Even over `PROJECT_ADVISORY_CHARS` this stays **advisory**: the user may decline, and the audit accepts that without re-raising it in the same run. There is no no-growth rule for a project file - a run that grows `./CLAUDE.md` is not a failed run.
 
 **Strict mode** applies the global file's rules (net delta `<= 0`, reduce until under target) to `./CLAUDE.md`, but only when the user asks in this run, or a `project`-type memory file for this repo records that preference. Precedence and how to record it: `size-budget.md` > "Strict mode for a project file".
 
-When strict is on it **replaces all three bands**, including the silent one: always print the project ledger line and always score the file, even under 20,000 chars. Say in the scorecard which trigger fired - `strict (requested)` or `strict (project memory)` - so it is obvious which rules produced the findings. Relocation destinations do not change: still project-local, never `~/.claude/notes/`.
+When strict is on it **replaces all three bands**, including the silent one: always print the project ledger line and always score the file, even under `PROJECT_SILENT_CHARS`. Say in the scorecard which trigger fired - `strict (requested)` or `strict (project memory)` - so it is obvious which rules produced the findings. Relocation destinations do not change: still project-local, never `~/.claude/notes/`.
 
 ## 9. Scope leakage (move)
 
