@@ -88,4 +88,60 @@ with tempfile.TemporaryDirectory() as d:
         detail="silently replacing bad bytes yields a confident wrong number",
     )
 
+print("\ncase: target_chars and over_target thresholds")
+
+with tempfile.TemporaryDirectory() as d:
+    # Test global-scope target (GLOBAL_TARGET_CHARS)
+    small_global = os.path.join(d, ".claude", "CLAUDE.md")
+    os.makedirs(os.path.dirname(small_global))
+    with open(small_global, "w", encoding="utf-8") as fh:
+        fh.write("x" * (constants.GLOBAL_TARGET_CHARS - 100))
+    m_small = measure.measure(small_global)
+    check(
+        "global-scope file has target_chars == GLOBAL_TARGET_CHARS",
+        m_small["target_chars"] == constants.GLOBAL_TARGET_CHARS,
+        detail="got {}".format(m_small["target_chars"]),
+    )
+    check(
+        "global file under target has over_target == False",
+        m_small["over_target"] is False,
+        detail="{} chars < {} target".format(m_small["chars"], m_small["target_chars"]),
+    )
+
+    large_global = os.path.join(d, ".claude", "CLAUDE2.md")
+    with open(large_global, "w", encoding="utf-8") as fh:
+        fh.write("x" * (constants.GLOBAL_TARGET_CHARS + 100))
+    m_large = measure.measure(large_global)
+    check(
+        "global file over target has over_target == True",
+        m_large["over_target"] is True,
+        detail="{} chars > {} target".format(m_large["chars"], m_large["target_chars"]),
+    )
+
+    # Test project-scope target (PROJECT_ADVISORY_CHARS)
+    small_project = os.path.join(d, "CLAUDE.md")
+    with open(small_project, "w", encoding="utf-8") as fh:
+        fh.write("x" * (constants.PROJECT_ADVISORY_CHARS - 100))
+    m_project_small = measure.measure(small_project)
+    check(
+        "project-scope file has target_chars == PROJECT_ADVISORY_CHARS",
+        m_project_small["target_chars"] == constants.PROJECT_ADVISORY_CHARS,
+        detail="got {}".format(m_project_small["target_chars"]),
+    )
+    check(
+        "project file under target has over_target == False",
+        m_project_small["over_target"] is False,
+        detail="{} chars < {} target".format(m_project_small["chars"], m_project_small["target_chars"]),
+    )
+
+    large_project = os.path.join(d, "CLAUDE2.md")
+    with open(large_project, "w", encoding="utf-8") as fh:
+        fh.write("x" * (constants.PROJECT_ADVISORY_CHARS + 100))
+    m_project_large = measure.measure(large_project)
+    check(
+        "project file over target has over_target == True",
+        m_project_large["over_target"] is True,
+        detail="{} chars > {} target".format(m_project_large["chars"], m_project_large["target_chars"]),
+    )
+
 report("core-measure")
