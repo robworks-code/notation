@@ -120,12 +120,48 @@ whole point of the core is that the audit and the capture agree.
 
 `$NOTATION` below is `${CLAUDE_PLUGIN_ROOT}`, this plugin's install root.
 
-Open the run once, holding the run id for the rest of the flow:
+**Mint the run id first, and record its literal value.** Shell variables do not
+survive to the next Bash call, so a later call that still says `"$RUN"` sends an
+empty id - and two sessions that both invent `notate` collide on one ledger.
+Generate one that cannot collide, print it, and substitute the printed value
+literally from then on, exactly as Step 6 does with the backup stamp:
+
+```sh
+printf 'run id: notate-%s-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" \
+  "$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+```
+
+**Opening an id that already has a ledger is refused (exit `2`).** That is
+deliberate: a second `open` used to write a fresh ledger and silently discard
+every proposal already recorded, after which the whole-run `gate` saw a net of
+zero and passed. If you have lost the id, mint a new one and start the run
+again - never re-open.
+
+**`open` registers every file this run will touch, not just the global one.**
+`--target` is repeatable, and `close` reconciles registered targets and nothing
+else: an unregistered note is one whose failed append reports as success, which
+is precisely the relocation defect this step exists to catch. So list the note
+or memory file beside `~/.claude/CLAUDE.md` whenever a proposal will write to
+one:
 
 ```sh
 python3 "$NOTATION/scripts/notation-core.py" open \
-  --target ~/.claude/CLAUDE.md --run-id "$RUN" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  --target ~/.claude/CLAUDE.md \
+  --target ~/.claude/notes/railway.md \
+  --run-id notate-20260804T171533Z-9f3a1c2b \
+  --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 ```
+
+If a later proposal turns out to need a file that was not listed, add it to the
+run in progress - `register` takes the same repeatable `--target`:
+
+```sh
+python3 "$NOTATION/scripts/notation-core.py" register \
+  --run-id notate-20260804T171533Z-9f3a1c2b --target ~/.claude/notes/pytest.md
+```
+
+You cannot forget this by accident: `price-record` refuses (exit `2`) a
+proposal whose target is not registered, and says which command to run.
 
 Then, per proposal, route it, price it, and record the price into the run -
 `price` only computes the delta, `price-record` is what makes the gate able to
@@ -163,13 +199,15 @@ python3 "$NOTATION/scripts/notation-core.py" price \
   --removed "$removed_file" --added "$added_file" --target ~/.claude/CLAUDE.md
 ```
 
-Then record the price into the run - `$DELTA` and `$BUCKET` are `price`'s own
-`delta` and `bucket` fields, read back out of the JSON it just printed, not
-recomputed:
+Then record the price into the run. `$DELTA`, `$BUCKET` and the target are
+`price`'s own `delta`, `bucket` and `target` fields, read back out of the JSON
+it just printed, not recomputed - `target` comes back in the core's own
+spelling, and passing that back is what guarantees the ledger keys match:
 
 ```sh
 python3 "$NOTATION/scripts/notation-core.py" price-record \
-  --run-id "$RUN" --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
+  --run-id notate-20260804T171533Z-9f3a1c2b \
+  --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
 ```
 
 Act on the `band` the core returns; the thresholds live in the core and are
@@ -181,6 +219,9 @@ deliberately not restated here:
   note, first check `candidates`: a new note is allowed only when nothing fits,
   and you must record why. Read `notes_searched` before believing an empty
   candidate list - `0` means the search never ran, not that nothing matched.
+  Read `unreadable` too: a note listed there was counted in `notes_searched`
+  but could only be ranked on its filename, so it is a note that could not be
+  read, not a note that did not match.
 
 ## Step 3 - Route each learning (do NOT dump)
 
@@ -309,8 +350,12 @@ Otherwise drive the apply flow with `AskUserQuestion` instead of asking freeform
 **The gate runs before any write, and its refusal is final for the global tier.**
 
 ```sh
-python3 "$NOTATION/scripts/notation-core.py" gate --run-id "$RUN"
+python3 "$NOTATION/scripts/notation-core.py" gate \
+  --run-id notate-20260804T171533Z-9f3a1c2b
 ```
+
+(Substitute the literal run id minted in Step 2.5 here and below, not `$RUN` -
+that variable is gone by this Bash call.)
 
 Exit `0` proceeds. Exit `1` means the run grows the gated global file; report the
 `reasons` verbatim and do not write to `~/.claude/CLAUDE.md`. Exit `2` is a core
@@ -320,12 +365,24 @@ A project-scoped write proceeds either way, with the warning shown.
 After the writes land, close the run:
 
 ```sh
-python3 "$NOTATION/scripts/notation-core.py" close --run-id "$RUN"
+python3 "$NOTATION/scripts/notation-core.py" close \
+  --run-id notate-20260804T171533Z-9f3a1c2b
 ```
 
-A non-zero exit here means the edit did not land as drafted. Report the
-`findings` verbatim rather than restating the predicted numbers as if they
-happened.
+A non-zero exit here means the edit did not land as drafted, or a registered
+file changed that this run never wrote to. Report the `findings` verbatim
+rather than restating the predicted numbers as if they happened.
+
+`close` runs once per run and marks the ledger closed; a second `close` on the
+same id exits `2` rather than re-reporting the first one's result as fresh.
+
+**`drift` is three-valued per file, and `none` is the only clean one.** `none`
+means the file is byte-identical to its pre-run hash. `detected` means it
+changed while this run had no proposal for it - report that as an outside edit.
+`undetermined` means the run wrote there and a size plus a pre-run hash cannot
+separate our write from someone else's; the run can still reconcile, but do not
+report it as "no outside edits" - say the question was not settled. The
+`drift_undetermined` list names those files.
 
 4. **Then apply the approved proposals.** Keep each content change atomic with its index update:
    - a note edit/create together with its Topical Notes Index line,

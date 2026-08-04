@@ -24,9 +24,32 @@ just with nothing standing between the verdict and the write. `$NOTATION` is
 text** - `route.py`/`price.py` call `os.path.isfile` on each. Write each slice
 to a temp file first:
 
+Mint the run id first and record its literal value - shell variables do not
+survive to the next Bash call, and a re-`open` on an id that already has a
+ledger is refused (exit `2`) rather than silently starting the proposal list
+over. Substitute the printed value literally into every later call:
+
+```sh
+printf 'run id: notate-all-%s-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" \
+  "$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+```
+
+**Register every file this run will touch**, not only the global one: `close`
+reconciles registered targets and nothing else, so a note that a relocation
+appends to must be a `--target` too, or its failed append reports as success.
+`register` adds one to a run already in progress, and `price-record` refuses
+(exit `2`) any proposal whose target is unregistered, so this cannot be skipped
+by accident:
+
 ```sh
 python3 "$NOTATION/scripts/notation-core.py" open \
-  --target ~/.claude/CLAUDE.md --run-id "$RUN" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  --target ~/.claude/CLAUDE.md \
+  --target ~/.claude/notes/railway.md \
+  --run-id notate-all-20260804T171533Z-9f3a1c2b \
+  --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+python3 "$NOTATION/scripts/notation-core.py" register \
+  --run-id notate-all-20260804T171533Z-9f3a1c2b --target ~/.claude/notes/pytest.md
 
 p_file=$(mktemp); printf '%s' "$PROPOSAL_TEXT" > "$p_file"
 python3 "$NOTATION/scripts/notation-core.py" route \
@@ -58,7 +81,8 @@ below, which is the one check standing in for the picker here:
 
 ```sh
 python3 "$NOTATION/scripts/notation-core.py" price-record \
-  --run-id "$RUN" --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
+  --run-id notate-all-20260804T171533Z-9f3a1c2b \
+  --delta "$DELTA" --bucket "$BUCKET" --target ~/.claude/CLAUDE.md
 ```
 
 Act on the `band` the core returns exactly as `commands/notate.md` Step 2.5 describes
@@ -66,7 +90,8 @@ Act on the `band` the core returns exactly as `commands/notate.md` Step 2.5 desc
 gate the whole run:
 
 ```sh
-python3 "$NOTATION/scripts/notation-core.py" gate --run-id "$RUN"
+python3 "$NOTATION/scripts/notation-core.py" gate \
+  --run-id notate-all-20260804T171533Z-9f3a1c2b
 ```
 
 Exit `0` proceeds. Exit `1` means the run grows the gated global file; report
@@ -77,12 +102,20 @@ not run. A project-scoped write proceeds either way, with the warning shown.
 After the writes land, close the run:
 
 ```sh
-python3 "$NOTATION/scripts/notation-core.py" close --run-id "$RUN"
+python3 "$NOTATION/scripts/notation-core.py" close \
+  --run-id notate-all-20260804T171533Z-9f3a1c2b
 ```
 
-A non-zero exit here means the edit did not land as drafted. Report the
-`findings` verbatim rather than restating the predicted numbers as if they
-happened.
+A non-zero exit here means the edit did not land as drafted, or a registered
+file changed that this run never wrote to. Report the `findings` verbatim
+rather than restating the predicted numbers as if they happened. `close` runs
+once; a second `close` on the same id exits `2`.
+
+Each file's `drift` is three-valued: `none` (byte-identical to the pre-run
+hash), `detected` (it changed with no proposal of ours to explain it), or
+`undetermined` (we wrote there, so the evidence cannot separate our write from
+anyone else's). Never report `undetermined` as "no outside edits" - the
+`drift_undetermined` list is the set of files this run could not clear.
 
 Then run Step 6 in **auto-apply mode**:
 

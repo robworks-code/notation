@@ -89,6 +89,7 @@ python3 tests/test_core_gate.py           || bad "core-gate tests"
 python3 tests/test_core_close.py          || bad "core-close tests"
 python3 tests/test_core_cli.py            || bad "core-cli tests"
 python3 tests/test_core_roundtrip.py      || bad "core-roundtrip tests"
+python3 tests/test_core_seams.py          || bad "core-seams tests"
 
 printf '\n'
 if [ "$fail" -ne 0 ]; then
