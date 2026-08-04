@@ -49,15 +49,25 @@ Compare the "Topical Notes Index" section in CLAUDE.md against the actual files 
 
 **Index encoding cost (move) - check this BEFORE hook length.** Separate from how long the hooks are: measure what each line spends on *syntax* rather than on routing. The markdown link form `- [name](notes/name.md) - hook` spells the name twice and costs roughly 34 chars per line more than `- name - hook`; at 100+ notes that is thousands of characters of pure encoding, and every one of those lines can sit comfortably under any length cap while the section as a whole is a third of the file. The path is derivable from the name, so state the convention once above the index (`each entry below is <name>.md there`) and drop the link syntax.
 
-Compute the saving by transforming every line and diffing the totals, never by estimating:
+Compute the saving by transforming every line and diffing the totals, never by estimating. Scope it to the index section - a markdown-link bullet anywhere else in the file would inflate the "current" total - capture the name from the **path**, not the link text, and write the rewritten index out so there is something to verify against:
 
 ```sh
-grep '^- \[' ~/.claude/CLAUDE.md | perl -ne '$o += length($_);
-  s/^- \[([a-z0-9-]+)\]\(notes\/[a-z0-9-]+\.md\)/- $1/; $n += length($_);
-  END { printf "current %d, compressed %d, saved %d\n", $o, $n, $o-$n }'
+awk '/^## .*Index/{i=1; next} /^## /{i=0} i' ~/.claude/CLAUDE.md \
+  | perl -ne 'BEGIN{$o=$n=$c=$skip=0}
+      next unless /^- \[/;
+      $c++; $o += length($_);
+      s{^- \[([a-z0-9-]+)\]\(notes/([a-z0-9-]+)\.md\)}
+       {$1 eq $2 ? "- $2" : do { $skip++; $& }}e;
+      $n += length($_); print;
+      END { printf STDERR "lines %d, current %d, compressed %d, saved %d, skipped %d\n",
+                          $c, $o, $n, $o-$n, $skip }'
 ```
 
-This is loss-free, relocates nothing, and needs no destination, which makes it the first index lever to reach for. It is also a different *kind* of finding from everything else in this checklist: the rest move facts, this one removes waste, so do not skip it just because no fact is in the wrong place. Verify it by asserting every note name still appears in the rewritten index - the count of index lines must be unchanged.
+The rewritten index goes to stdout and the stats to stderr, so redirect stdout to a scratch file when you want to diff it against the original. Verify by asserting the line count is unchanged and every note name still appears.
+
+The `$1 eq $2` guard is load-bearing. Link text and filename are independent, so `- [claude-code](notes/claude-code-internals.md) - ...` would compress to `- claude-code - ...` and the path would no longer be derivable from the name - a silent loss, not a saving. Those lines are left in link form and counted as `skipped`; either rename the note to match its label or leave them. A `skipped` count above zero is a finding in its own right: the index labels and the filenames have drifted apart.
+
+`saved 0` with `lines 0` means the index is already bare (or the heading regex missed it) - report "nothing to do", not a saving. This is loss-free, relocates nothing, and needs no destination, which makes it the first index lever to reach for. It is also a different *kind* of finding from everything else in this checklist: the rest move facts, this one removes waste, so do not skip it just because no fact is in the wrong place.
 
 **Index-line compression (move).** The index routes; it does not teach. Measure the per-line spread (`awk`/`wc` the index section: median length, and how many lines exceed ~100 chars) before quoting a saving - the section total says nothing about how much of it is compressible. Flag lines well over the cap and propose shorter hooks that keep the same routing trigger; any detail worth keeping goes into the note itself, not the index. In a mature setup this is often the second-biggest lever after subsection moves.
 
@@ -87,17 +97,32 @@ Spot facts that appear in more than one tier (e.g. a CLI quirk both inline in CL
 1. **Sections that cite their own destination.** An inline block containing `` `notes/x.md` `` or a skill name is self-identifying: something already decided where this belongs. Rank by section size, because the cost of leaving it inline scales with it.
 
    ```sh
-   awk '/^### /{if(h && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9-]+`/) print c"\t"h; h=$0; c=0; buf=""}
-        {c+=length($0)+1; buf=buf"\n"$0}
-        END{if(h && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9-]+`/) print c"\t"h}' ~/.claude/CLAUDE.md | sort -rn
+   awk -v min=600 '
+     BEGIN{h="(top of file, before the first heading)"}
+     function flush(){ if(h!="" && buf ~ /notes\/[a-z0-9-]+\.md|skill `[a-z0-9-]+`/)
+                       { if(c>=min) print c"\t"h; else below++ } }
+     /^#+ /{ flush(); h=$0; c=0; buf="" }
+     { c+=length($0)+1; buf=buf"\n"$0 }
+     END{ flush(); if(below) printf "(%d citing section(s) below min=%d, not shown)\n", below, min > "/dev/stderr" }
+   ' ~/.claude/CLAUDE.md | sort -rn
    ```
+
+   Two details decide whether this reports anything real:
+
+   - **It must break on every heading level (`^#+ `), not just `### `.** Resetting only on `###` makes each `##` heading and all its content spill into the *preceding* `###` section's buffer. On a file whose last `###` section is followed by a large `##` index, that one section absorbs the whole tail and ranks first by a wide margin - so the top-ranked proposal is to relocate the index under an unrelated heading. Everything before the first heading, and every `##` section that is not itself under a `###`, is also invisible to the `###`-only form; seed `h` in `BEGIN` so the preamble is a testable unit.
+   - **`min` separates a stale duplicate from the healthy end state.** A trigger line plus a `Full reference: notes/x.md` pointer is exactly what this checklist prescribes as *correct*, and it matches the citation pattern just as well as a full inline copy does. Without a floor the detector fires on nearly every section and ranks nothing. The size *is* the signal: what you are looking for is body sitting alongside the pointer. Sections under the floor are counted to stderr rather than dropped silently - a large `below` count with an empty result means the setup is healthy, not that the detector failed.
 
 2. **The relocation breadcrumb.** A note or skill section headed `(relocated from CLAUDE.md ...)` whose distinctive text is STILL in CLAUDE.md is a **proven** duplicate - the relocation appended but never removed. Near-zero false positives, because the heading is a claim the move completed.
 
    ```sh
-   grep -l "relocated from CLAUDE.md" ~/.claude/notes/*.md ~/.claude/skills/*/SKILL.md
-   # then probe a distinctive line from each such section against ~/.claude/CLAUDE.md
+   grep -rlE '^#+ .*relocated from CLAUDE\.md' ~/.claude/notes ~/.claude/skills 2>/dev/null
+   # then, for EACH breadcrumbed section, probe a distinctive line
+   # from THAT section (not from elsewhere in the note) against ~/.claude/CLAUDE.md
    ```
+
+   Anchor the pattern to a heading. Unanchored, it also matches prose that merely *discusses* relocation, and a note that documents this checklist matches itself. Pass directories to `grep -r` rather than globbing `~/.claude/skills/*/SKILL.md`: under zsh an unmatched glob aborts the whole command before `grep` runs, so a machine with no personal skills dir silently skips the notes half too - the exact clean-looking empty run this check exists to prevent.
+
+   Scope the probe to the relocated section, ending at the next heading. A note usually holds several sections and only one of them claims to be a relocation; probing the whole file reports a stale relocation on the strength of an unrelated line and points the auditor at the wrong text.
 
 **Divergence is worse than duplication, and this check must look for it too.** Two tiers describing the same subject with *incompatible* claims is not wasted context, it is a wrong action waiting to happen - and the newer, more specific measurement is usually the one buried in the note. When the two copies disagree, do not silently keep either: name both, say which is newer and what evidence dates it, and correct the loser in place rather than deleting it. `/notation:notate` Step 2 already does this for local vs checked-in files; the same rule applies between CLAUDE.md and a note. A dated correction ("measured 2026-08-02: did not reproduce") always outranks an undated assertion.
 
