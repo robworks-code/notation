@@ -35,6 +35,9 @@ deployment detail. Full rule, the mirror case, and the never-cross list: `scope-
    (a cloud provider's quirk, one CLI's auth flow, one library's gotcha, one MCP server's behavior)
    -> **`~/.claude/notes/<topic>.md`** + a line in the Topical Notes Index. This is the default home for most discoveries.
 
+2b. **Is it a PROCEDURE rather than a fact** - ordered steps, a workflow, a decision tree, a checklist someone would follow start to finish?
+   -> **A skill**: `~/.claude/skills/<name>/SKILL.md`, with the trigger left inline and the body loaded on invocation. Notes answer "what is true about X"; skills answer "how do I do X". A long inline section whose content is steps is a skill that has not been extracted yet. Extracting one costs no index line, which makes it cheaper than a note.
+
 3. **Is it specific to the current project** - its architecture, a decision, a non-obvious gotcha, a workflow - and NOT derivable from the code, README, or git history?
    -> **Project memory**: a frontmatter file in `~/.claude/projects/<encoded-cwd>/memory/` + a pointer line in `MEMORY.md`.
 

@@ -13,6 +13,7 @@ Inspect the health of the user's Claude Code memory across all tiers, report pro
 - **Topical notes** - `~/.claude/notes/*.md`: situational, loaded on demand, each registered by a line in the "Topical Notes Index" at the bottom of CLAUDE.md.
 - **Project memory** - `~/.claude/projects/<encoded-cwd>/memory/`: one fact per frontmatter file, indexed by `MEMORY.md`.
 - **Project docs / CLAUDE.md** - `./.claude/docs/`, `./CLAUDE.md`: project-tracked guides and team conventions.
+- **Skills** - `~/.claude/skills/<name>/SKILL.md` and plugin skills: procedural how-to, loaded on demand by name. A skill is BOTH a valid relocation destination and a duplication counterparty. Do not treat it as out of scope because this plugin ships as one: an inline CLAUDE.md section that names a skill is the highest-confidence move in the file, and check 5 must compare against skills the same way it compares against notes.
 
 ## How to run an audit
 
