@@ -32,7 +32,7 @@ def band(text):
 
 
 def _note_tokens(path):
-    """Filename plus headings plus first line of each section."""
+    """Filename plus headings (lines starting with #)."""
     name = os.path.basename(path)
     if name.endswith(".md"):
         name = name[:-3]

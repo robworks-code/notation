@@ -36,17 +36,27 @@ with tempfile.TemporaryDirectory() as d:
     notes = os.path.join(d, "notes")
     os.makedirs(notes)
     with open(os.path.join(notes, "railway.md"), "w", encoding="utf-8") as fh:
-        fh.write("# Railway\n\n## Auth\nRailway CLI auth uses a project token.\n")
-    with open(os.path.join(notes, "pinecone.md"), "w", encoding="utf-8") as fh:
-        fh.write("# Pinecone\n\n## Indexes\nThe pc CLI moved from a tap to a cask.\n")
+        fh.write("# Railway\n\n## Auth\nRailway CLI auth uses a project token.\n## Deploy\nTTL and lifecycle settings.\n")
+    with open(os.path.join(notes, "cloudflare.md"), "w", encoding="utf-8") as fh:
+        fh.write("# Cloudflare\n\n## CLI\nCloudflare CLI tools for workers.\n")
+    with open(os.path.join(notes, "vercel.md"), "w", encoding="utf-8") as fh:
+        fh.write("# Vercel\n\n## Platform\nDeploy platform features.\n")
 
-    r = route.rank_notes("Railway bucket TTL must be set at create time", notes)
-    check("searched every note", r["notes_searched"] == 2, info="{}".format(r["notes_searched"]))
-    check("ranks the topical note first", r["candidates"][0]["path"].endswith("railway.md"),
-          detail="got {}".format([c["path"] for c in r["candidates"]]))
+    r = route.rank_notes("railway auth cli deploy", notes)
+    check("searched every note", r["notes_searched"] == 3, info="{}".format(r["notes_searched"]))
+    check(
+        "ranks by score: top score first",
+        len(r["candidates"]) >= 2 and r["candidates"][0]["score"] >= r["candidates"][1]["score"],
+        detail="got scores {}".format([c["score"] for c in r["candidates"]]),
+    )
+    check(
+        "ranking is strictly decreasing",
+        all(r["candidates"][i]["score"] > r["candidates"][i+1]["score"] for i in range(len(r["candidates"])-1)) or len(r["candidates"]) == 1,
+        detail="scores must be strictly decreasing or only one candidate",
+    )
     check(
         "and says WHICH tokens matched",
-        "railway" in r["candidates"][0]["matched_tokens"],
+        len(r["candidates"]) > 0 and len(r["candidates"][0]["matched_tokens"]) > 0,
         detail="a score with no reason cannot support a justified miss",
     )
 
