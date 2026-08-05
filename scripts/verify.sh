@@ -9,6 +9,24 @@
 set -eu
 
 cd "$(dirname "$0")/.."
+
+# This gate enumerates the shipped files with `git ls-files`, so outside a
+# checkout every scan reads nothing. The scans catch that themselves and fail
+# loudly rather than passing on an empty file list - that part is correct and
+# must stay. What they cannot know is WHY the list was empty, so a plugin
+# install (this file ships in the tarball) reported a gate that could not run
+# as a gate that ran and found seven defects.
+#
+# Exit 2 keeps the three codes meaning what the core already made them mean:
+# 0 clean, 1 real failures, 2 no verdict was produced.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  printf 'CANNOT VERIFY: not a git checkout\n'
+  printf 'This gate enumerates the shipped files with `git ls-files`, so it\n'
+  printf 'only runs from a clone: https://github.com/robworks-code/notation\n'
+  printf 'The installed plugin carries these files but cannot run them.\n'
+  exit 2
+fi
+
 fail=0
 
 step() { printf '\n== %s ==\n' "$1"; }
@@ -78,6 +96,9 @@ python3 tests/test_detection_coverage.py || bad "detection-coverage tests"
 
 step "command-doc-drift tests"
 python3 tests/test_command_doc_drift.py || bad "command-doc-drift tests"
+
+step "verify-outside-checkout tests"
+python3 tests/test_verify_outside_checkout.py || bad "verify-outside-checkout tests"
 
 step "notation_core tests"
 python3 tests/test_core_measure.py        || bad "core-measure tests"
