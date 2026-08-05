@@ -76,6 +76,21 @@ python3 tests/test_preservation_probe.py || bad "preservation mutation tests"
 step "detection-coverage tests"
 python3 tests/test_detection_coverage.py || bad "detection-coverage tests"
 
+step "command-doc-drift tests"
+python3 tests/test_command_doc_drift.py || bad "command-doc-drift tests"
+
+step "notation_core tests"
+python3 tests/test_core_measure.py        || bad "core-measure tests"
+python3 tests/test_core_route.py          || bad "core-route tests"
+python3 tests/test_core_price.py          || bad "core-price tests"
+python3 tests/test_core_ledger.py         || bad "core-ledger tests"
+python3 tests/test_core_ledger_errors.py  || bad "core-ledger-errors tests"
+python3 tests/test_core_gate.py           || bad "core-gate tests"
+python3 tests/test_core_close.py          || bad "core-close tests"
+python3 tests/test_core_cli.py            || bad "core-cli tests"
+python3 tests/test_core_roundtrip.py      || bad "core-roundtrip tests"
+python3 tests/test_core_seams.py          || bad "core-seams tests"
+
 printf '\n'
 if [ "$fail" -ne 0 ]; then
   printf 'VERIFY FAILED\n'
