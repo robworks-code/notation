@@ -89,10 +89,25 @@ def plant(home, project):
     return paths, other
 
 
+ZSH = "/bin/zsh"
+
+
 def main():
     block = listing_block()
     check("check 7 ships one bash listing block", block is not None)
     if block is None:
+        return 1
+
+    # A missing zsh must fail loudly and by name. Left to itself this surfaces as
+    # a bare FileNotFoundError traceback from subprocess, which reads as a broken
+    # test rather than a missing dependency - and the recipe under test exists
+    # specifically to survive zsh's nomatch abort, so no other shell can stand in.
+    check(
+        "a real zsh is available to run the shipped recipe",
+        os.path.exists(ZSH),
+        detail="{} not found - install zsh; sh and bash cannot prove this recipe".format(ZSH),
+    )
+    if not os.path.exists(ZSH):
         return 1
 
     tmp = tempfile.mkdtemp(prefix="notation-bak-")
@@ -115,7 +130,7 @@ def main():
         # match that, not accidentally test a stale-PWD scenario.
         env = dict(os.environ, HOME=home, PWD=project)
         out = subprocess.run(
-            ["/bin/zsh", "-c", block],
+            [ZSH, "-c", block],
             capture_output=True,
             text=True,
             cwd=project,
@@ -158,7 +173,7 @@ def main():
         empty = os.path.join(tmp, "empty")
         os.makedirs(os.path.join(empty, "proj"), exist_ok=True)
         bare = subprocess.run(
-            ["/bin/zsh", "-c", block],
+            [ZSH, "-c", block],
             capture_output=True,
             text=True,
             cwd=os.path.join(empty, "proj"),
@@ -179,7 +194,7 @@ def main():
             if blk is None:
                 continue
             r = subprocess.run(
-                ["/bin/zsh", "-c", blk],
+                [ZSH, "-c", blk],
                 capture_output=True, text=True,
                 cwd=os.path.join(empty, "proj"),
                 env=dict(os.environ, HOME=empty, PWD=os.path.join(empty, "proj")),
@@ -204,7 +219,7 @@ def main():
             os.makedirs(keep, exist_ok=True)
             open(f"{spent}/.verified", "w").write("ok\n")
             r = subprocess.run(
-                ["/bin/zsh", "-c", sorter], capture_output=True, text=True,
+                [ZSH, "-c", sorter], capture_output=True, text=True,
                 cwd=h2, env=dict(os.environ, HOME=h2, PWD=h2),
             )
             lines = {ln.split(None, 1)[0]: ln for ln in r.stdout.strip().splitlines() if ln.strip()}

@@ -43,6 +43,13 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      - name: Install zsh
+        # Not a convenience: the backup-listing recipe exists to avoid zsh's
+        # nomatch abort, so the test that proves it must run under a real zsh.
+        # macOS runners already ship one.
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+
       - name: Confirm the interpreter under test
         run: python3 -VV
 
